@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Time Tracker</title>
+  <script>
+    // Apply the saved theme before the page draws, so it doesn't flash.
+    try {
+      var savedTheme = localStorage.getItem("timeTracker.theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    } catch (err) {}
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="app-header">
+      <h1>Time Tracker</h1>
+      <p class="header-total">Today <strong id="today-total">0h 00m</strong></p>
+      <button id="theme-button" class="theme-button" type="button">Theme: Auto</button>
+    </header>
+
+    <p id="storage-warning" class="warning" hidden>
+      Storage is blocked, so data won't be kept after you close this page.
+    </p>
+
+    <section aria-labelledby="timer-heading">
+      <h2 id="timer-heading">Timer</h2>
+
+      <form id="timer-form">
+        <label for="task-input">Task</label>
+        <input id="task-input" type="text" list="task-suggestions" autocomplete="off"
+               placeholder="e.g. Studying">
+        <datalist id="task-suggestions"></datalist>
+
+        <div class="buttons">
+          <button id="start-button" type="submit">Start</button>
+          <button id="stop-button" type="button" disabled>Stop</button>
+        </div>
+      </form>
+
+      <div class="timer-display">
+        <p id="running-task" class="running-task">No timer running</p>
+        <p id="clock" class="clock" role="timer">00:00</p>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <section aria-labelledby="today-heading">
+      <h2 id="today-heading">Today</h2>
+      <p id="today-empty" class="empty">Nothing tracked today yet.</p>
+      <ul id="task-rows" class="task-rows"></ul>
+
+      <h3 id="entries-heading">Entries</h3>
+      <p id="entries-empty" class="empty">No entries yet today.</p>
+      <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
+    </section>
+  </main>
+
+  <div id="undo-toast" class="toast" role="status" hidden>
+    <span id="undo-text"></span>
+    <button id="undo-button" type="button">Undo</button>
+  </div>
+</body>
+</html>

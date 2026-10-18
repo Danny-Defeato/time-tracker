@@ -29,6 +29,8 @@ Artifact 2 ("something you will use").
 
 - One `localStorage` key, `timeTracker.v1`, holding JSON:
   `{ "entries": [ { "id", "task", "start", "end" } ], "running": { "task", "start" } | null }`
+- A second key, `timeTracker.theme`, holds only the theme choice: `"auto"`, `"light"` or `"dark"`.
+  It's kept separate so the time data and CSV export stay clean.
 - `start` / `end` are ISO timestamps. A running timer stores only its start time,
   and elapsed time is always computed as now minus start (never by counting ticks),
   so a reload or a sleeping laptop doesn't lose time.
@@ -43,8 +45,12 @@ Artifact 2 ("something you will use").
 
 1. Start/stop timer: type or pick a task name, Start, Stop. Stopping saves an entry.
    The task box suggests task names I've used before.
-2. Today: total time per task for today, plus today's entries (with delete).
-   Deleting asks for confirmation first. Today's totals include the running timer live.
+2. Today: one row per task done today (most time first) with its time, a thin bar showing
+   its share of today's total, and a ▶/■ button to start or stop it. Below them, up to 5
+   recent tasks from earlier days, dimmed, with ▶. Then today's entries, newest first,
+   with delete. Deleting happens right away with an Undo button for about 6 seconds
+   (no confirm question). Today's grand total is shown in the page header.
+   Totals include the running timer live. Today switches to the new day at midnight by itself.
 3. History: pick a past day to see its totals, plus a 7-day summary.
 4. Manual entry (task, date, start and end time) for time I forgot to track;
    reject an end time before the start. "Export CSV" downloads all entries with
@@ -53,7 +59,11 @@ Artifact 2 ("something you will use").
 ## Style
 
 - Plain and simple: clean layout, readable on phone and laptop, light and dark mode
-  following the device setting.
+  following the device setting, unless the header's theme button (Auto / Light / Dark)
+  overrides it.
+- Each task gets a colour from a fixed 8-colour palette, picked from its name, so the
+  same name always has the same colour. It's used for its row stripe, bar and entry dot.
+  Palette colours must be readable in both themes.
 - Durations shown as `1h 05m` (and `mm:ss` on the live timer).
 - Buttons and inputs must work with the keyboard and have visible focus.
 

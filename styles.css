@@ -1,0 +1,417 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c1e21;
+  --muted: #5f6670;
+  --border: #d4d8de;
+  --track: #e8ebef;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --focus: #f59e0b;
+  --warning-bg: #fff4d6;
+  --warning-text: #6b4a00;
+  --toast-bg: #1c1e21;
+  --toast-text: #ffffff;
+  --toast-accent: #93c5fd;
+
+  /* Task colours: at least 3:1 against the surface colour. */
+  --task-0: #2563eb;
+  --task-1: #15803d;
+  --task-2: #c2410c;
+  --task-3: #7c3aed;
+  --task-4: #0f766e;
+  --task-5: #be185d;
+  --task-6: #a16207;
+  --task-7: #0369a1;
+
+  color-scheme: light;
+}
+
+/* Dark values: used when the device is dark (unless the theme button says Light),
+   or when the theme button says Dark. Both blocks hold the same values. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a;
+    --surface: #1f2226;
+    --text: #e8eaed;
+    --muted: #a0a7b0;
+    --border: #3a3f46;
+    --track: #2c3036;
+    --accent: #60a5fa;
+    --accent-text: #0b1220;
+    --focus: #fbbf24;
+    --warning-bg: #3a2f10;
+    --warning-text: #f5d98a;
+    --toast-bg: #e8eaed;
+    --toast-text: #15171a;
+    --toast-accent: #1d4ed8;
+    --task-0: #60a5fa;
+    --task-1: #4ade80;
+    --task-2: #fb923c;
+    --task-3: #a78bfa;
+    --task-4: #2dd4bf;
+    --task-5: #f472b6;
+    --task-6: #facc15;
+    --task-7: #38bdf8;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171a;
+  --surface: #1f2226;
+  --text: #e8eaed;
+  --muted: #a0a7b0;
+  --border: #3a3f46;
+  --track: #2c3036;
+  --accent: #60a5fa;
+  --accent-text: #0b1220;
+  --focus: #fbbf24;
+  --warning-bg: #3a2f10;
+  --warning-text: #f5d98a;
+  --toast-bg: #e8eaed;
+  --toast-text: #15171a;
+  --toast-accent: #1d4ed8;
+  --task-0: #60a5fa;
+  --task-1: #4ade80;
+  --task-2: #fb923c;
+  --task-3: #a78bfa;
+  --task-4: #2dd4bf;
+  --task-5: #f472b6;
+  --task-6: #facc15;
+  --task-7: #38bdf8;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1.5rem 16px 6rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.header-total {
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.header-total strong {
+  color: var(--text);
+}
+
+.theme-button {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+/* ---------- Timer ---------- */
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+input,
+button {
+  font: inherit;
+  border-radius: 6px;
+}
+
+input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+.buttons button {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+#stop-button {
+  background: transparent;
+  color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.timer-display {
+  text-align: center;
+  margin-top: 1.25rem;
+}
+
+.running-task {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.clock {
+  margin: 0;
+  font-size: 3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  min-height: 1.5em;
+  margin: 0.5rem 0 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+}
+
+/* ---------- Today: task rows ---------- */
+
+.empty {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.task-rows,
+.entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0 0.6rem 0.75rem;
+  border-left: 4px solid var(--task-color);
+  border-bottom: 1px solid var(--border);
+}
+
+.task-row:last-child {
+  border-bottom: none;
+}
+
+.task-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.task-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.row-button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.task-row-running {
+  background: color-mix(in srgb, var(--task-color) 10%, transparent);
+}
+
+.task-row-running .row-button {
+  border-color: var(--task-color);
+  color: var(--task-color);
+}
+
+.task-row-other .task-name,
+.task-row-other .task-time {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.share-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.share-fill {
+  height: 100%;
+  width: 0;
+  background: var(--task-color);
+  border-radius: 3px;
+}
+
+/* ---------- Today: entries ---------- */
+
+.entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas:
+    "dot task duration delete"
+    ".   range duration delete";
+  align-items: center;
+  column-gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.entry:last-child {
+  border-bottom: none;
+}
+
+.dot {
+  grid-area: dot;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--task-color);
+}
+
+.entry-task {
+  grid-area: task;
+  overflow-wrap: anywhere;
+}
+
+.entry-range {
+  grid-area: range;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.entry-duration {
+  grid-area: duration;
+  font-variant-numeric: tabular-nums;
+}
+
+.delete-button {
+  grid-area: delete;
+  width: 44px;
+  height: 44px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.delete-button:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ---------- Undo toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--toast-bg);
+  color: var(--toast-text);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+
+.toast span {
+  overflow-wrap: anywhere;
+}
+
+#undo-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: none;
+  background: transparent;
+  color: var(--toast-accent);
+  font-weight: 700;
+}
