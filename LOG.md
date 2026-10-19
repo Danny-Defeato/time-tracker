@@ -269,3 +269,66 @@ Also fixed: the header showed "0h 00m" for a moment on load, without the seconds
 - If the entry was deleted in another tab while the window was open, saving explains that instead of failing silently.
 
 **Testing:** 10 new checks in headless Chrome, all passing: filled-in window, rename keeping seconds, Undo, changing the length, Cancel, blank name, future time, renaming a 20-second entry, editing from History, and the phone layout. The full suite is now **118 checks**, all passing. The tab-order check was updated because Edit buttons are now in the Tab order.
+
+## 2026-10-18: The other ideas (themes, accent, goals, rename, reminder, overlap, shortcuts, last tab)
+
+**Asked for:** add the remaining ideas (1, 2, 6, 7, 8, 9, 10, 11), then move on to Phase 5.
+
+**How it stays simple:** almost everything lives in one **Settings** window, opened from the header (it replaces the old theme button), so the main screen didn't get busier. Each change applies straight away.
+
+**Changed:** `index.html`, `styles.css`, `app.js`, `CLAUDE.md`.
+- **Theme presets (1):** Auto, Light, Dark, plus **Warm paper** (soft off-white), **Midnight** (deep blue) and **High contrast** (black on white, strong borders, darker task colours). A small script in the page's `<head>` applies the choice before the page draws, so there's no flash.
+- **Accent colour (2):** blue, green, purple, orange, pink or teal, each with a darker shade for light themes and a lighter one for dark themes.
+- **Keyboard shortcuts (6):** `S` start/stop, `N` jump to the task box, `1` `2` `3` switch tabs.
+  - Ignored while typing in a box, with a window open, or with Ctrl/Alt/⌘ held.
+  - They can be turned off, because single-key shortcuts can get in the way of screen readers (an accessibility guideline asks for this).
+- **Rename or merge (7):** pick a task and type a new name. Using a name that already exists merges the two. It also renames the running timer, the task box and any goal. Undo sits right in the window, because the usual Undo popup can't be reached while a window is open.
+- **Daily goals (8):** for example "Studying: 1h a day". Today shows `0h 30m 00s / 1h`, then `✓ 1h 00m 00s / 1h` in the accent colour once met. Goals can be removed.
+- **"Still working?" (9):** after 4 hours (or 2, 8, or never) a banner appears under the timer.
+  - **Keep going** asks again after the next block (8h, then 12h).
+  - **Stop now** saves the entry and suggests fixing the end with Edit.
+  - Screen readers announce it once, not every second.
+- **Overlap warning (10):** adding or editing time that overlaps another entry or the running timer warns once, naming what it overlaps. Pressing the button again keeps it. Changing the times checks again.
+- **Last tab (11):** the page reopens on the tab you used last.
+
+**Decisions**
+- Goals and settings aren't part of backups; backups hold only time entries.
+- The "Keep going" choice is forgotten on reload, so the question can come back after reloading. That errs on the side of catching a forgotten timer.
+
+**Testing:** the full suite is now **150 checks** in headless Chrome, all passing. New checks cover:
+- all five themes looking different
+- a contrast check of every theme with every accent (text 7:1, muted and error text 4.5:1, button text 4.5:1, task colours 3:1)
+- the accent being remembered and switching shade in dark themes
+- goals (set, progress, met, removed, missing task)
+- rename and merge (moves the goal, Undo, renames the running timer)
+- the banner (shows, Keep going, Stop now, Never)
+- overlaps (warns, warns again after a change, keeps on the second press, no warning when clear)
+- shortcuts (S, S, 2, N, typing S in the box, turning them off)
+- the last tab
+- Settings fitting on a phone
+
+Looking at the screenshots found one problem the checks missed: at phone width, the accent colour names overflowed the Settings window. It's fixed with two columns on narrow screens, and a check now confirms nothing sticks out at 320px, 375px and desktop width.
+
+## 2026-10-18: Phase 5, getting ready to deploy
+
+**Asked for:** move on to Phase 5 (deploy to GitHub Pages and the portfolio card).
+
+**Done by Claude**
+- **Pre-deploy check:** only relative links (`styles.css`, `app.js`), nothing loaded from other sites, and file names match exactly (GitHub Pages cares about capital letters).
+- **Web-server smoke test:** served the folder on a local web server under `/time-tracker/`, like GitHub Pages, and checked in headless Chrome:
+  - the page loads
+  - start/stop works
+  - Copy uses the real clipboard
+  - the Excel and backup downloads work
+  - settings are remembered
+  - there are no console errors
+
+  All 7 checks passed.
+- **README.md** rewritten for the repository page: what the app does, the privacy note, how it's built, and links to this log and the plan.
+
+**Left for me** (I push and commit myself, and the reflection has to be in my own words):
+- push, turn on GitHub Pages, and test on my phone and laptop
+- move my test data across with Backup if I want it
+- fill in the portfolio card and write the reflection
+
+**Note:** the times saved while opening `index.html` as a file live in a different browser storage area than the live site. The live site starts empty, and Download a backup / Restore from a backup moves the data over.

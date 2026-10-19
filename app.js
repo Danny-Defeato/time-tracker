@@ -13,7 +13,6 @@ const runningTaskText = document.getElementById("running-task");
 const clock = document.getElementById("clock");
 const statusText = document.getElementById("status");
 const todayTotalText = document.getElementById("today-total");
-const themeButton = document.getElementById("theme-button");
 const todayEmpty = document.getElementById("today-empty");
 const taskRows = document.getElementById("task-rows");
 const entriesEmpty = document.getElementById("entries-empty");
@@ -282,47 +281,82 @@ function taskColor(name) {
   return "var(--task-" + (hash % TASK_COLOR_COUNT) + ")";
 }
 
-// ---------- Theme ----------
+// ---------- Settings ----------
+// Each setting has its own key. If storage is blocked, changes still apply for this visit.
 
-const THEMES = ["auto", "light", "dark"];
+const ACCENT_KEY = "timeTracker.accent";
+const TAB_KEY = "timeTracker.tab";
+const GOALS_KEY = "timeTracker.goals";
+const REMIND_KEY = "timeTracker.remindHours";
+const SHORTCUTS_KEY = "timeTracker.shortcuts";
 
-function loadTheme() {
+const THEMES = ["auto", "light", "dark", "warm", "midnight", "contrast"];
+const ACCENTS = ["blue", "green", "purple", "orange", "pink", "teal"];
+const REMIND_CHOICES = ["0", "2", "4", "8"];
+
+function readSetting(key, fallback, isValid) {
   try {
-    const saved = localStorage.getItem(THEME_KEY);
-    return THEMES.includes(saved) ? saved : "auto";
+    const value = localStorage.getItem(key);
+    return value !== null && isValid(value) ? value : fallback;
   } catch (err) {
-    return "auto";
+    return fallback;
   }
 }
 
-function applyTheme(theme) {
-  if (theme === "auto") {
-    delete document.documentElement.dataset.theme;
-  } else {
-    document.documentElement.dataset.theme = theme;
-  }
-  const label = theme[0].toUpperCase() + theme.slice(1);
-  themeButton.textContent = "Theme: " + label;
-}
-
-function cycleTheme() {
-  const next = THEMES[(THEMES.indexOf(currentTheme) + 1) % THEMES.length];
+function writeSetting(key, value) {
   try {
-    localStorage.setItem(THEME_KEY, next);
+    localStorage.setItem(key, value);
   } catch (err) {
-    // Storage blocked: the theme still changes for this visit.
+    // Storage blocked: the setting still applies for this visit.
   }
-  currentTheme = next;
-  applyTheme(next);
 }
 
-let currentTheme = loadTheme();
+function loadSettings() {
+  return {
+    theme: readSetting(THEME_KEY, "auto", (v) => THEMES.includes(v)),
+    accent: readSetting(ACCENT_KEY, "blue", (v) => ACCENTS.includes(v)),
+    remindHours: Number(readSetting(REMIND_KEY, "4", (v) => REMIND_CHOICES.includes(v))),
+    shortcuts: readSetting(SHORTCUTS_KEY, "on", (v) => v === "on" || v === "off") === "on",
+  };
+}
+
+let settings = loadSettings();
+
+// Theme and accent go on <html> as data-theme / data-accent (see styles.css).
+function applyLook() {
+  const root = document.documentElement;
+  if (settings.theme === "auto") delete root.dataset.theme;
+  else root.dataset.theme = settings.theme;
+  if (settings.accent === "blue") delete root.dataset.accent;
+  else root.dataset.accent = settings.accent;
+}
+
+// Daily goals: { "Studying": 120 } (minutes per day).
+function loadGoals() {
+  const goals = {};
+  try {
+    const data = JSON.parse(localStorage.getItem(GOALS_KEY) || "{}");
+    for (const [task, minutes] of Object.entries(data && typeof data === "object" ? data : {})) {
+      if (task.trim() && Number.isInteger(minutes) && minutes > 0 && minutes <= 24 * 60) goals[task.trim()] = minutes;
+    }
+  } catch (err) {
+    // missing or corrupt: no goals
+  }
+  return goals;
+}
+
+function saveGoals() {
+  writeSetting(GOALS_KEY, JSON.stringify(goals));
+}
+
+let goals = loadGoals();
 
 // ---------- Tabs ----------
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 
-// Shows one panel. Only the selected tab is in the Tab order; arrow keys move between tabs.
+// Shows one panel and remembers it for next time. Only the selected tab is in the
+// Tab order; arrow keys move between tabs.
 function selectTab(tab, { focus = false } = {}) {
   for (const t of tabs) {
     const selected = t === tab;
@@ -330,6 +364,7 @@ function selectTab(tab, { focus = false } = {}) {
     t.tabIndex = selected ? 0 : -1;
     document.getElementById(t.getAttribute("aria-controls")).hidden = !selected;
   }
+  writeSetting(TAB_KEY, tab.id);
   if (focus) tab.focus();
 }
 
@@ -696,6 +731,8 @@ function renderLive(totals) {
     : "Time Tracker";
   todayTotalText.textContent = formatSeconds(sumSeconds(totals));
   updateRowNumbers(taskRows, totals);
+  applyGoals(totals);
+  updateLongTimer();
   if (historyKey === dateKey(Date.now())) renderHistoryRows();
   updateWeekNumbers(weekData());
 }
@@ -767,6 +804,7 @@ let addDay = null; // the day the dialog adds time to (for an edit: the entry's 
 let addOpener = null; // where focus goes back to when the dialog closes
 let editingId = null; // the entry being edited, or null when adding
 let timesChanged = false; // in edit mode: did the person touch the start or length?
+let overlapConfirmed = ""; // the times the person already chose to keep despite an overlap
 
 function showFormMessage(el, text, isError) {
   el.textContent = text;
@@ -788,6 +826,7 @@ function openDialog(title, saveLabel, values) {
   addHours.value = String(values.hours);
   addMinutes.value = String(values.minutes);
   timesChanged = false;
+  overlapConfirmed = "";
   showFormMessage(addMessage, "");
   for (const input of [addTask, addStart, addHours, addMinutes]) input.removeAttribute("aria-invalid");
   addDialog.showModal();
@@ -860,6 +899,18 @@ function saveAddedTime() {
 
     endMs = startMs + lengthMs;
     if (endMs > Date.now()) return fail(addStart, "That would end later than now. Check the start time and length.");
+  }
+
+  // Warn once if the new times overlap other time; pressing the button again keeps them.
+  if (!(original && !timesChanged)) {
+    const clash = findOverlap(startMs, endMs, editingId);
+    const choice = startMs + "|" + endMs;
+    if (clash && overlapConfirmed !== choice) {
+      overlapConfirmed = choice;
+      const day = dayRange(startMs);
+      return fail(addStart, "This overlaps " + clash.task + " (" + formatTime(clash.start, day) + " – " +
+        formatTime(clash.end, day) + "). Press " + addSave.textContent + " again to keep it anyway.");
+    }
   }
 
   const start = new Date(startMs).toISOString();
@@ -1186,6 +1237,254 @@ async function restoreBackup(file) {
   }, restoreButton);
 }
 
+// ---------- Daily goals on Today's rows ----------
+
+// After the row times are filled in: "1h 05m 09s / 2h", and a ✓ once the goal is met.
+function applyGoals(totals) {
+  for (const li of taskRows.children) {
+    const goal = goals[li.dataset.task];
+    const met = Boolean(goal) && (totals.get(li.dataset.task) || 0) >= goal * 60;
+    li.classList.toggle("goal-met", met);
+    if (!goal) continue;
+    const time = li.querySelector(".task-time");
+    time.textContent = (met ? "✓ " : "") + time.textContent + " / " + formatHm(goal);
+  }
+}
+
+// ---------- "Still working?" check ----------
+
+const longTimer = document.getElementById("long-timer");
+const longTimerText = document.getElementById("long-timer-text");
+const longKeep = document.getElementById("long-keep");
+const longStop = document.getElementById("long-stop");
+let longSnooze = { start: null, until: 0 }; // "Keep going" pushes the next question back
+
+function updateLongTimer() {
+  const limit = settings.remindHours * 3600000;
+  const elapsed = elapsedMs();
+  const snoozed = state.running && longSnooze.start === state.running.start ? longSnooze.until : 0;
+  const show = Boolean(state.running) && limit > 0 && elapsed >= Math.max(limit, snoozed);
+  if (show && longTimer.hidden) {
+    // Text is set once when it appears (not every second), so screen readers announce it once.
+    longTimerText.textContent = state.running.task + " has been running for " +
+      formatHm(Math.floor(elapsed / 60000)) + ". Still working?";
+    longTimer.hidden = false;
+  } else if (!show && !longTimer.hidden) {
+    longTimer.hidden = true;
+  }
+}
+
+function keepGoing() {
+  const limit = settings.remindHours * 3600000;
+  // Ask again after the next block of the same length (4h → 8h → 12h).
+  longSnooze = { start: state.running.start, until: (Math.floor(elapsedMs() / limit) + 1) * limit };
+  longTimer.hidden = true;
+  stopButton.focus();
+}
+
+function stopFromCheck() {
+  longTimer.hidden = true;
+  stopTimer();
+  setStatus(statusText.textContent + " If you stopped working earlier, fix the time with Edit.");
+  taskInput.focus();
+}
+
+// ---------- Overlap warning ----------
+
+// The first other entry (or the running timer) that overlaps [startMs, endMs].
+function findOverlap(startMs, endMs, ignoreId) {
+  for (const e of state.entries) {
+    if (e.id === ignoreId) continue;
+    if (Date.parse(e.start) < endMs && Date.parse(e.end) > startMs) {
+      return { task: e.task, start: Date.parse(e.start), end: Date.parse(e.end) };
+    }
+  }
+  if (state.running && Date.parse(state.running.start) < endMs && Date.now() > startMs) {
+    return { task: state.running.task + " (running now)", start: Date.parse(state.running.start), end: Date.now() };
+  }
+  return null;
+}
+
+// ---------- Settings window ----------
+
+const settingsDialog = document.getElementById("settings-dialog");
+const settingsButton = document.getElementById("settings-button");
+const settingsClose = document.getElementById("settings-close");
+const themeSelect = document.getElementById("theme-select");
+const accentRadios = [...document.querySelectorAll('input[name="accent"]')];
+const remindSelect = document.getElementById("long-timer-select");
+const shortcutsCheck = document.getElementById("shortcuts-check");
+const goalList = document.getElementById("goal-list");
+const goalTask = document.getElementById("goal-task");
+const goalHours = document.getElementById("goal-hours");
+const goalMinutes = document.getElementById("goal-minutes");
+const goalSave = document.getElementById("goal-save");
+const goalMessage = document.getElementById("goal-message");
+const renameFrom = document.getElementById("rename-from");
+const renameTo = document.getElementById("rename-to");
+const renameSave = document.getElementById("rename-save");
+const renameMessage = document.getElementById("rename-message");
+const renameUndo = document.getElementById("rename-undo");
+let renameUndoState = null;
+
+function openSettings() {
+  themeSelect.value = settings.theme;
+  for (const radio of accentRadios) radio.checked = radio.value === settings.accent;
+  remindSelect.value = String(settings.remindHours);
+  shortcutsCheck.checked = settings.shortcuts;
+  showFormMessage(goalMessage, "");
+  showFormMessage(renameMessage, "");
+  renameUndo.hidden = true;
+  renameUndoState = null;
+  renderGoalList();
+  renderRenameOptions();
+  settingsDialog.showModal();
+  themeSelect.focus();
+}
+
+function renderGoalList() {
+  const names = Object.keys(goals).sort((a, b) => a.localeCompare(b));
+  goalList.replaceChildren(...names.map((task) => {
+    const li = document.createElement("li");
+    const text = document.createElement("span");
+    text.textContent = task + ": " + formatHm(goals[task]) + " a day";
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "link-button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", "Remove goal for " + task);
+    remove.addEventListener("click", () => {
+      delete goals[task];
+      saveGoals();
+      renderGoalList();
+      render();
+      showFormMessage(goalMessage, "Removed the goal for " + task + ".");
+      goalTask.focus();
+    });
+    li.append(text, remove);
+    return li;
+  }));
+}
+
+function setGoal() {
+  const task = goalTask.value.trim();
+  const hours = wholeNumber(goalHours);
+  const minutes = wholeNumber(goalMinutes);
+  const fail = (field, text) => {
+    showFormMessage(goalMessage, text, true);
+    field.focus();
+  };
+  if (!task) return fail(goalTask, "Type the task the goal is for.");
+  if (hours === null || minutes === null || minutes > 59) return fail(goalHours, "Use whole numbers: hours, and minutes from 0 to 59.");
+  const total = hours * 60 + minutes;
+  if (total === 0 || total > 24 * 60) return fail(goalHours, "A daily goal has to be between 1 minute and 24 hours.");
+  goals[task] = total;
+  saveGoals();
+  renderGoalList();
+  render();
+  goalTask.value = "";
+  showFormMessage(goalMessage, "Goal set: " + task + ", " + formatHm(total) + " a day.");
+}
+
+// Every task name in use: saved entries, the running timer, and goals.
+function allTaskNames() {
+  const names = taskSuggestions();
+  if (state.running && !names.includes(state.running.task)) names.unshift(state.running.task);
+  return names;
+}
+
+function renderRenameOptions(selected) {
+  const names = allTaskNames();
+  renameFrom.replaceChildren(...names.map((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    return option;
+  }));
+  if (names.length === 0) {
+    const option = document.createElement("option");
+    option.textContent = "No tasks yet";
+    renameFrom.append(option);
+  }
+  renameFrom.disabled = names.length === 0;
+  renameSave.disabled = names.length === 0;
+  if (selected && names.includes(selected)) renameFrom.value = selected;
+}
+
+function renameTask() {
+  const from = renameFrom.value;
+  const to = renameTo.value.trim();
+  renameUndo.hidden = true;
+  const fail = (text) => {
+    showFormMessage(renameMessage, text, true);
+    renameTo.focus();
+  };
+  if (!to) return fail("Type the new name.");
+  if (to === from) return fail("That's already its name.");
+
+  const merging = allTaskNames().includes(to);
+  renameUndoState = { entries: state.entries.map((e) => ({ ...e })), running: state.running && { ...state.running }, goals: { ...goals } };
+  let count = 0;
+  for (const e of state.entries) {
+    if (e.task === from) {
+      e.task = to;
+      count++;
+    }
+  }
+  if (state.running && state.running.task === from) state.running.task = to;
+  if (goals[from]) {
+    if (!goals[to]) goals[to] = goals[from];
+    delete goals[from];
+  }
+  if (taskInput.value.trim() === from) taskInput.value = to;
+  saveState();
+  saveGoals();
+  render();
+  renderRenameOptions(to);
+  renameTo.value = "";
+  const entries = count + (count === 1 ? " entry" : " entries");
+  showFormMessage(renameMessage, merging ? "Merged “" + from + "” into “" + to + "” (" + entries + ")."
+    : "Renamed “" + from + "” to “" + to + "” (" + entries + ").");
+  renameUndo.hidden = false;
+}
+
+function undoRename() {
+  if (!renameUndoState) return;
+  state.entries = renameUndoState.entries;
+  state.running = renameUndoState.running;
+  goals = renameUndoState.goals;
+  renameUndoState = null;
+  saveState();
+  saveGoals();
+  render();
+  renderRenameOptions();
+  renameUndo.hidden = true;
+  showFormMessage(renameMessage, "Rename undone.");
+  renameFrom.focus();
+}
+
+// ---------- Keyboard shortcuts ----------
+
+function onShortcut(event) {
+  if (!settings.shortcuts || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+  if (document.querySelector("dialog[open]")) return;
+  const target = event.target;
+  if (target.closest && target.closest("input, textarea, select, [contenteditable]")) return;
+  const key = event.key.toLowerCase();
+  if (key === "s") {
+    event.preventDefault();
+    if (state.running) stopTimer();
+    else startTimer(taskInput.value);
+  } else if (key === "n") {
+    event.preventDefault();
+    taskInput.focus();
+    taskInput.select();
+  } else if (["1", "2", "3"].includes(key)) {
+    event.preventDefault();
+    selectTab(tabs[Number(key) - 1], { focus: true });
+  }
+}
+
 // ---------- Events ----------
 
 form.addEventListener("submit", (event) => {
@@ -1198,7 +1497,6 @@ stopButton.addEventListener("click", () => {
   taskInput.focus();
 });
 
-themeButton.addEventListener("click", cycleTheme);
 undoButton.addEventListener("click", runUndo);
 
 addTodayButton.addEventListener("click", () => openAddDialog(dayRange(Date.now())));
@@ -1219,6 +1517,37 @@ copyButton.addEventListener("click", copyDay);
 youtrackCheck.addEventListener("change", resetCopy);
 exportButton.addEventListener("click", exportExcel);
 backupButton.addEventListener("click", downloadBackup);
+
+settingsButton.addEventListener("click", openSettings);
+settingsClose.addEventListener("click", () => settingsDialog.close());
+settingsDialog.addEventListener("close", () => settingsButton.focus());
+themeSelect.addEventListener("change", () => {
+  settings.theme = themeSelect.value;
+  writeSetting(THEME_KEY, settings.theme);
+  applyLook();
+});
+for (const radio of accentRadios) {
+  radio.addEventListener("change", () => {
+    settings.accent = radio.value;
+    writeSetting(ACCENT_KEY, settings.accent);
+    applyLook();
+  });
+}
+remindSelect.addEventListener("change", () => {
+  settings.remindHours = Number(remindSelect.value);
+  writeSetting(REMIND_KEY, remindSelect.value);
+  updateLongTimer();
+});
+shortcutsCheck.addEventListener("change", () => {
+  settings.shortcuts = shortcutsCheck.checked;
+  writeSetting(SHORTCUTS_KEY, settings.shortcuts ? "on" : "off");
+});
+goalSave.addEventListener("click", setGoal);
+renameSave.addEventListener("click", renameTask);
+renameUndo.addEventListener("click", undoRename);
+longKeep.addEventListener("click", keepGoing);
+longStop.addEventListener("click", stopFromCheck);
+document.addEventListener("keydown", onShortcut);
 restoreButton.addEventListener("click", () => restoreInput.click());
 restoreInput.addEventListener("change", () => restoreBackup(restoreInput.files[0]));
 
@@ -1238,11 +1567,17 @@ document.addEventListener("visibilitychange", () => {
 
 // Another tab changed the data: reload it so the tabs don't overwrite each other.
 window.addEventListener("storage", (event) => {
-  if (event.key === THEME_KEY) {
-    currentTheme = loadTheme();
-    applyTheme(currentTheme);
+  if ([THEME_KEY, ACCENT_KEY, REMIND_KEY, SHORTCUTS_KEY].includes(event.key)) {
+    settings = loadSettings();
+    applyLook();
     return;
   }
+  if (event.key === GOALS_KEY) {
+    goals = loadGoals();
+    render();
+    return;
+  }
+  if (event.key === TAB_KEY) return;
   if (event.key !== STORAGE_KEY && event.key !== null) return;
   const wasRunning = state.running && state.running.task;
   state = loadState();
@@ -1255,7 +1590,9 @@ window.addEventListener("storage", (event) => {
 
 // ---------- Start up ----------
 
-applyTheme(currentTheme);
+applyLook();
+const savedTab = readSetting(TAB_KEY, "tab-today", (v) => tabs.some((t) => t.id === v));
+selectTab(tabs.find((t) => t.id === savedTab));
 if (state.running) taskInput.value = state.running.task;
 const startNow = new Date();
 historyKey = dateKey(new Date(startNow.getFullYear(), startNow.getMonth(), startNow.getDate() - 1).getTime());

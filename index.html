@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Time Tracker</title>
   <script>
-    // Apply the saved theme before the page draws, so it doesn't flash.
+    // Apply the saved theme and accent before the page draws, so they don't flash.
     try {
       var savedTheme = localStorage.getItem("timeTracker.theme");
-      if (savedTheme === "light" || savedTheme === "dark") {
+      if (["light", "dark", "warm", "midnight", "contrast"].indexOf(savedTheme) !== -1) {
         document.documentElement.dataset.theme = savedTheme;
+      }
+      var savedAccent = localStorage.getItem("timeTracker.accent");
+      if (["green", "purple", "orange", "pink", "teal"].indexOf(savedAccent) !== -1) {
+        document.documentElement.dataset.accent = savedAccent;
       }
     } catch (err) {}
   </script>
@@ -21,7 +25,7 @@
     <header class="app-header">
       <h1>Time Tracker</h1>
       <p class="header-total">Today <strong id="today-total">0h 00m 00s</strong></p>
-      <button id="theme-button" class="theme-button" type="button">Theme: Auto</button>
+      <button id="settings-button" class="header-button" type="button">Settings</button>
     </header>
 
     <p id="storage-warning" class="warning" hidden>
@@ -49,6 +53,14 @@
       </div>
 
       <p id="status" class="status" role="status"></p>
+
+      <div id="long-timer" class="long-timer" role="alert" hidden>
+        <p id="long-timer-text"></p>
+        <div class="dialog-buttons">
+          <button id="long-keep" class="secondary-button" type="button">Keep going</button>
+          <button id="long-stop" class="action-button" type="button">Stop now</button>
+        </div>
+      </div>
     </section>
 
     <div class="tabs" role="tablist" aria-label="Views">
@@ -137,6 +149,77 @@
         <button id="add-save" class="action-button" type="submit">Add</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+
+    <h3>Look</h3>
+    <label for="theme-select">Theme</label>
+    <select id="theme-select">
+      <option value="auto">Auto (follow my device)</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="warm">Warm paper</option>
+      <option value="midnight">Midnight</option>
+      <option value="contrast">High contrast</option>
+    </select>
+    <fieldset>
+      <legend>Accent colour</legend>
+      <div class="swatches">
+        <label class="swatch"><input type="radio" name="accent" value="blue"><span class="swatch-color" style="--swatch: #2563eb"></span>Blue</label>
+        <label class="swatch"><input type="radio" name="accent" value="green"><span class="swatch-color" style="--swatch: #15803d"></span>Green</label>
+        <label class="swatch"><input type="radio" name="accent" value="purple"><span class="swatch-color" style="--swatch: #7c3aed"></span>Purple</label>
+        <label class="swatch"><input type="radio" name="accent" value="orange"><span class="swatch-color" style="--swatch: #c2410c"></span>Orange</label>
+        <label class="swatch"><input type="radio" name="accent" value="pink"><span class="swatch-color" style="--swatch: #be185d"></span>Pink</label>
+        <label class="swatch"><input type="radio" name="accent" value="teal"><span class="swatch-color" style="--swatch: #0f766e"></span>Teal</label>
+      </div>
+    </fieldset>
+
+    <h3>Daily goals</h3>
+    <p class="hint">Set a target for a task. Today shows how close you are.</p>
+    <ul id="goal-list" class="goal-list"></ul>
+    <label for="goal-task">Task</label>
+    <input id="goal-task" type="text" list="task-suggestions" autocomplete="off" aria-describedby="goal-message">
+    <fieldset>
+      <legend>Goal each day</legend>
+      <div class="duration-pair">
+        <label for="goal-hours"><input id="goal-hours" type="number" min="0" max="24" step="1" inputmode="numeric" value="1" aria-describedby="goal-message"> hours</label>
+        <label for="goal-minutes"><input id="goal-minutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-describedby="goal-message"> minutes</label>
+      </div>
+    </fieldset>
+    <button id="goal-save" class="secondary-button" type="button">Set goal</button>
+    <p id="goal-message" class="form-message" role="status"></p>
+
+    <h3>Rename or merge a task</h3>
+    <p class="hint">Fixes a name everywhere. Renaming to a name you already use merges the two.</p>
+    <label for="rename-from">Task</label>
+    <select id="rename-from" aria-describedby="rename-message"></select>
+    <label for="rename-to">New name</label>
+    <input id="rename-to" type="text" list="task-suggestions" autocomplete="off" aria-describedby="rename-message">
+    <button id="rename-save" class="secondary-button" type="button">Rename</button>
+    <p class="form-message-row"><span id="rename-message" class="form-message" role="status"></span>
+      <button id="rename-undo" class="link-button" type="button" hidden>Undo</button></p>
+
+    <h3>Reminder</h3>
+    <label for="long-timer-select">Ask “Still working?” when a timer has run for</label>
+    <select id="long-timer-select">
+      <option value="0">Never ask</option>
+      <option value="2">2 hours</option>
+      <option value="4">4 hours</option>
+      <option value="8">8 hours</option>
+    </select>
+
+    <h3>Keyboard shortcuts</h3>
+    <label class="checkbox"><input id="shortcuts-check" type="checkbox"> Use keyboard shortcuts</label>
+    <ul class="hint shortcut-list">
+      <li><kbd>S</kbd> start or stop the timer</li>
+      <li><kbd>N</kbd> go to the task box</li>
+      <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> Today, History, Week</li>
+    </ul>
+    <p class="hint">They're ignored while you're typing in a box.</p>
+
+    <button id="settings-close" class="action-button" type="button">Done</button>
   </dialog>
 
   <div id="undo-toast" class="toast" role="status" hidden>

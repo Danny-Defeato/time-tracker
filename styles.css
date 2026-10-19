@@ -1,3 +1,19 @@
+/* ---------- Colours ----------
+   Themes (Settings → Theme, saved in timeTracker.theme) set data-theme on <html>:
+   none = Auto (follows the device), light, dark, warm, midnight, contrast.
+   The accent colour (data-accent) has a shade for light themes and one for dark themes. */
+
+:root {
+  --accent-l: #2563eb; /* blue */
+  --accent-d: #60a5fa;
+}
+:root[data-accent="green"]  { --accent-l: #15803d; --accent-d: #4ade80; }
+:root[data-accent="purple"] { --accent-l: #7c3aed; --accent-d: #a78bfa; }
+:root[data-accent="orange"] { --accent-l: #c2410c; --accent-d: #fb923c; }
+:root[data-accent="pink"]   { --accent-l: #be185d; --accent-d: #f472b6; }
+:root[data-accent="teal"]   { --accent-l: #0f766e; --accent-d: #2dd4bf; }
+
+/* Light (also the base for Warm paper and High contrast) */
 :root {
   --bg: #f6f7f9;
   --surface: #ffffff;
@@ -5,7 +21,7 @@
   --muted: #5f6670;
   --border: #d4d8de;
   --track: #e8ebef;
-  --accent: #2563eb;
+  --accent: var(--accent-l);
   --accent-text: #ffffff;
   --focus: #f59e0b;
   --warning-bg: #fff4d6;
@@ -28,17 +44,17 @@
   color-scheme: light;
 }
 
-/* Dark values: used when the device is dark (unless the theme button says Light),
-   or when the theme button says Dark. Both blocks hold the same values. */
+/* Dark (also the base for Midnight). Used for Auto on a dark device, Dark and Midnight.
+   The two blocks hold the same values. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     --bg: #15171a;
     --surface: #1f2226;
     --text: #e8eaed;
     --muted: #a0a7b0;
     --border: #3a3f46;
     --track: #2c3036;
-    --accent: #60a5fa;
+    --accent: var(--accent-d);
     --accent-text: #0b1220;
     --focus: #fbbf24;
     --warning-bg: #3a2f10;
@@ -59,14 +75,15 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+:root[data-theme="midnight"] {
   --bg: #15171a;
   --surface: #1f2226;
   --text: #e8eaed;
   --muted: #a0a7b0;
   --border: #3a3f46;
   --track: #2c3036;
-  --accent: #60a5fa;
+  --accent: var(--accent-d);
   --accent-text: #0b1220;
   --focus: #fbbf24;
   --warning-bg: #3a2f10;
@@ -84,6 +101,46 @@
   --task-6: #facc15;
   --task-7: #38bdf8;
   color-scheme: dark;
+}
+
+/* Midnight: deep blue instead of grey. */
+:root[data-theme="midnight"] {
+  --bg: #0b1020;
+  --surface: #121a33;
+  --text: #e6e9f2;
+  --muted: #a3acc6;
+  --border: #2a3558;
+  --track: #1e2848;
+}
+
+/* Warm paper: soft off-white. */
+:root[data-theme="warm"] {
+  --bg: #f4efe4;
+  --surface: #fffdf8;
+  --text: #2b2620;
+  --muted: #655c50;
+  --border: #ddd3c1;
+  --track: #ebe3d3;
+  --warning-bg: #fbecc8;
+}
+
+/* High contrast: black on white, strong borders, darker task colours. */
+:root[data-theme="contrast"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #000000;
+  --muted: #262626;
+  --border: #000000;
+  --track: #c4c4c4;
+  --focus: #b45309;
+  --task-0: #1d4ed8;
+  --task-1: #166534;
+  --task-2: #9a3412;
+  --task-3: #6d28d9;
+  --task-4: #115e59;
+  --task-5: #9d174d;
+  --task-6: #854d0e;
+  --task-7: #075985;
 }
 
 * {
@@ -151,7 +208,7 @@ section {
   color: var(--text);
 }
 
-.theme-button {
+.header-button {
   margin-left: auto;
   flex: 0 0 auto;
   padding: 0.35rem 0.75rem;
@@ -679,4 +736,147 @@ legend {
   background: transparent;
   color: var(--toast-accent);
   font-weight: 700;
+}
+
+/* ---------- Settings ---------- */
+
+#settings-dialog h3 {
+  margin: 1.5rem 0 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+#settings-dialog h2 + h3 {
+  margin-top: 0.5rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+#settings-dialog select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+#settings-dialog select:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.25rem 0.5rem;
+  margin-top: 0.25rem;
+}
+
+#settings-dialog label.swatch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0;
+  font-weight: 400;
+}
+
+.swatch input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
+.swatch input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.swatch-color {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 1px solid var(--border);
+}
+
+.goal-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.goal-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.link-button {
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.form-message-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+}
+
+.form-message-row .form-message {
+  margin: 0;
+}
+
+.shortcut-list {
+  padding-left: 1.2rem;
+  margin: 0.25rem 0;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 0.3em;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: 0.85rem ui-monospace, "Cascadia Mono", Consolas, monospace;
+  text-align: center;
+}
+
+/* ---------- Goals and the long-timer check ---------- */
+
+.task-row.goal-met .task-time {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.long-timer {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 2px solid var(--focus);
+  border-radius: 8px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.long-timer p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.long-timer .secondary-button,
+.long-timer .action-button {
+  margin-top: 0.5rem;
 }
