@@ -20,7 +20,7 @@
   <main>
     <header class="app-header">
       <h1>Time Tracker</h1>
-      <p class="header-total">Today <strong id="today-total">0h 00m</strong></p>
+      <p class="header-total">Today <strong id="today-total">0h 00m 00s</strong></p>
       <button id="theme-button" class="theme-button" type="button">Theme: Auto</button>
     </header>
 
@@ -32,7 +32,7 @@
       <h2 id="timer-heading">Timer</h2>
 
       <form id="timer-form">
-        <label for="task-input">Task</label>
+        <label for="task-input">What are you working on?</label>
         <input id="task-input" type="text" list="task-suggestions" autocomplete="off"
                placeholder="e.g. Studying">
         <datalist id="task-suggestions"></datalist>
@@ -44,7 +44,7 @@
       </form>
 
       <div class="timer-display">
-        <p id="running-task" class="running-task">No timer running</p>
+        <p id="running-task" class="running-task">Type what you're working on, then press Start.</p>
         <p id="clock" class="clock" role="timer">00:00</p>
       </div>
 
@@ -54,7 +54,7 @@
     <div class="tabs" role="tablist" aria-label="Views">
       <button id="tab-today" class="tab" type="button" role="tab" aria-controls="panel-today" aria-selected="true">Today</button>
       <button id="tab-history" class="tab" type="button" role="tab" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
-      <button id="tab-week" class="tab" type="button" role="tab" aria-controls="panel-week" aria-selected="false" tabindex="-1">Last 7 days</button>
+      <button id="tab-week" class="tab" type="button" role="tab" aria-controls="panel-week" aria-selected="false" tabindex="-1">Week</button>
     </div>
 
     <section id="panel-today" class="panel" role="tabpanel" aria-labelledby="tab-today">
@@ -65,24 +65,45 @@
       <h3 id="entries-heading">Entries</h3>
       <p id="entries-empty" class="empty">No entries yet today.</p>
       <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
+
+      <button id="add-today-button" class="secondary-button" type="button">+ Add time you forgot to track</button>
     </section>
 
     <section id="panel-history" class="panel" role="tabpanel" aria-labelledby="tab-history" hidden>
       <h2 id="history-heading" class="visually-hidden">History</h2>
       <label for="history-date">Day</label>
       <input id="history-date" type="date">
-      <p class="section-total">Total <strong id="history-total">0h 00m</strong></p>
+      <p class="section-total">Total <strong id="history-total">0h 00m 00s</strong></p>
       <p id="history-empty" class="empty">Nothing tracked on this day.</p>
       <ul id="history-rows" class="task-rows"></ul>
       <div id="history-entries-block">
         <h3 id="history-entries-heading">Entries</h3>
         <ul id="history-entries" class="entry-list" aria-labelledby="history-entries-heading"></ul>
       </div>
+
+      <button id="add-history-button" class="secondary-button" type="button">+ Add time to this day</button>
+
+      <h3 id="share-heading">Share</h3>
+      <button id="copy-button" class="secondary-button" type="button">Copy this day as text</button>
+      <label class="checkbox"><input id="youtrack-check" type="checkbox"> Use YouTrack format</label>
+      <p id="copy-message" class="form-message" role="status"></p>
+      <textarea id="copy-fallback" class="copy-fallback" rows="5" readonly aria-label="Text to copy" hidden></textarea>
+
+      <button id="export-button" class="secondary-button" type="button">Download all entries for Excel</button>
+      <p id="export-message" class="form-message" role="status"></p>
+
+      <h3 id="backup-heading">Backup</h3>
+      <p class="hint">Your times are saved only in this browser. Keep a backup file in case you clear
+        your browser data or switch devices.</p>
+      <button id="backup-button" class="secondary-button" type="button">Download a backup</button>
+      <button id="restore-button" class="secondary-button" type="button">Restore from a backup</button>
+      <input id="restore-input" type="file" accept=".json,application/json" hidden>
+      <p id="backup-message" class="form-message" role="status"></p>
     </section>
 
     <section id="panel-week" class="panel" role="tabpanel" aria-labelledby="tab-week" hidden>
-      <h2 id="week-heading" class="visually-hidden">Last 7 days</h2>
-      <p class="section-total">Total <strong id="week-total">0h 00m</strong></p>
+      <h2 id="week-heading">Last 7 days</h2>
+      <p class="section-total">Total <strong id="week-total">0h 00m 00s</strong></p>
       <h3 id="week-days-heading">By day</h3>
       <ul id="week-days" class="week-days" aria-labelledby="week-days-heading"></ul>
       <h3 id="week-tasks-heading">By task</h3>
@@ -90,6 +111,33 @@
       <ul id="week-tasks" class="task-rows" aria-labelledby="week-tasks-heading"></ul>
     </section>
   </main>
+
+  <dialog id="add-dialog" aria-labelledby="add-title">
+    <form id="add-form" novalidate>
+      <h2 id="add-title">Add time</h2>
+
+      <label for="add-task">What did you work on?</label>
+      <input id="add-task" type="text" list="task-suggestions" autocomplete="off" aria-describedby="add-message">
+
+      <label for="add-start">Started at</label>
+      <input id="add-start" type="time" aria-describedby="add-message">
+
+      <fieldset>
+        <legend>How long?</legend>
+        <div class="duration-pair">
+          <label for="add-hours"><input id="add-hours" aria-describedby="add-message" type="number" min="0" max="24" step="1" inputmode="numeric" value="0"> hours</label>
+          <label for="add-minutes"><input id="add-minutes" aria-describedby="add-message" type="number" min="0" max="59" step="1" inputmode="numeric" value="0"> minutes</label>
+        </div>
+      </fieldset>
+
+      <p id="add-message" class="form-message" role="status"></p>
+
+      <div class="dialog-buttons">
+        <button id="add-cancel" class="secondary-button" type="button">Cancel</button>
+        <button id="add-save" class="action-button" type="submit">Add</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="undo-toast" class="toast" role="status" hidden>
     <span id="undo-text"></span>

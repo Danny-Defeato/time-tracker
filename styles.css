@@ -10,6 +10,7 @@
   --focus: #f59e0b;
   --warning-bg: #fff4d6;
   --warning-text: #6b4a00;
+  --danger: #b91c1c;
   --toast-bg: #1c1e21;
   --toast-text: #ffffff;
   --toast-accent: #93c5fd;
@@ -42,6 +43,7 @@
     --focus: #fbbf24;
     --warning-bg: #3a2f10;
     --warning-text: #f5d98a;
+    --danger: #f87171;
     --toast-bg: #e8eaed;
     --toast-text: #15171a;
     --toast-accent: #1d4ed8;
@@ -69,6 +71,7 @@
   --focus: #fbbf24;
   --warning-bg: #3a2f10;
   --warning-text: #f5d98a;
+  --danger: #f87171;
   --toast-bg: #e8eaed;
   --toast-text: #15171a;
   --toast-accent: #1d4ed8;
@@ -329,10 +332,10 @@ button:focus-visible {
 
 .entry {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   grid-template-areas:
-    "dot task duration delete"
-    ".   range duration delete";
+    "dot task duration edit delete"
+    ".   range duration edit delete";
   align-items: center;
   column-gap: 0.6rem;
   padding: 0.45rem 0;
@@ -365,6 +368,21 @@ button:focus-visible {
 .entry-duration {
   grid-area: duration;
   font-variant-numeric: tabular-nums;
+}
+
+.edit-button {
+  grid-area: edit;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.edit-button:hover {
+  border-color: var(--border);
 }
 
 .delete-button {
@@ -472,6 +490,162 @@ button:focus-visible {
 
 .week-fill {
   background: var(--accent);
+}
+
+/* ---------- Add time dialog, share buttons ---------- */
+
+.secondary-button,
+.action-button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 1rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--accent);
+  font-weight: 600;
+}
+
+.secondary-button {
+  background: transparent;
+  color: var(--accent);
+}
+
+.action-button {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+#share-heading {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+#share-heading + .secondary-button {
+  margin-top: 0.5rem;
+}
+
+#backup-heading {
+  margin-top: 1.5rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hint + .secondary-button {
+  margin-top: 0.5rem;
+}
+
+label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0.25rem 0 0;
+  font-weight: 500;
+}
+
+.checkbox input {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+}
+
+.checkbox input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.form-message {
+  min-height: 1.5em;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+.form-message.error {
+  color: var(--danger);
+}
+
+.copy-fallback {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: 0.9rem ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+dialog {
+  width: min(28rem, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+dialog h2 {
+  margin-bottom: 1rem;
+}
+
+dialog label {
+  margin-top: 0.75rem;
+}
+
+fieldset {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: none;
+}
+
+legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.duration-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.duration-pair label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 400;
+}
+
+.duration-pair input {
+  width: 100%;
+  min-width: 0;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dialog-buttons button {
+  flex: 1;
 }
 
 /* ---------- Undo toast ---------- */

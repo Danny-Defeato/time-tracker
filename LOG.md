@@ -141,3 +141,131 @@ What I set out to build, what I asked the agent for, what I decided, and what I 
 - For Phase 4: YouTrack takes whole minutes, so the Copy summary's YouTrack preset will round to minutes. The CSV can include a seconds column.
 
 **Testing:** Claude ran 70 checks in headless Chrome, all passing. New checks covered the tabs (click, arrow keys, Home and End, only one panel shown), live seconds in every total, totals adding up with odd-second entries (40s + 40s + 20s = 1m 40s everywhere), 44px tap targets on tabs, and the Today tab fitting on a phone. Earlier checks were updated for the seconds format. One first-run failure came from the test measuring a button inside a hidden tab; the app was fine.
+
+## 2026-10-18: Feature 4, Add time, Export CSV and Copy summary
+
+**Asked for:** build Phase 4 as planned. I also approved ideas 1–11 for afterward (not 12 or 13), to be built one at a time after this is committed.
+
+**Changed:** `index.html`, `styles.css`, `app.js`, `CLAUDE.md`.
+- **New tab, Add & export.** The "Last 7 days" tab label is now "Week" so four tabs fit on a phone; the heading inside still says Last 7 days.
+- **Add time:** task (with suggestions), date (up to today), start, end, and an "Ends the next day" checkbox.
+  - **Rejected, with a clear message next to the field:**
+    - a missing field
+    - an end before the start (the message points to the checkbox)
+    - more than 24 hours
+    - time in the future
+  - The new entry shows up in every view straight away.
+- **Export CSV:** columns `task, date, start, end, minutes, seconds`. An entry crossing midnight becomes two rows (the first ends at `24:00:00`), so each date adds up to what the app shows.
+  - **Excel-safe:** a BOM so Excel reads accented letters, quotes around names with commas or quotes, and a `'` in front of names starting with `= + - @` so Excel can't run them as formulas.
+  - Downloads as `time-tracker-YYYY-MM-DD.csv`. The running timer isn't included until it's stopped.
+- **Copy summary:** a day picker, a format picker (Plain list / YouTrack / Spreadsheet / Custom), an editable line format, a live preview, and a Copy button.
+  - **Blanks you can use:** `{date} {task} {duration} {minutes} {hm} {tab}`.
+  - **YouTrack preset:** `work {date} {hm} {task}`. It leaves out tasks under 30 seconds, because YouTrack rejects 0 minutes.
+  - If the browser blocks the clipboard, the preview text is selected for Ctrl+C.
+
+**Decisions**
+- Manual entries may overlap existing ones (an overlap warning is idea 10, coming later).
+- Summary lines are sorted by most time first. The preview refreshes when data changes, and pressing Copy recalculates first, so a running timer is counted up to that moment.
+
+**Testing:** Claude ran 96 checks in headless Chrome, all passing. They covered every validation message, the midnight entry from the form (30 min on each day), the CSV contents (quoting, formula guard, decimal minutes, midnight split, each date adding up to the app), the real downloaded file (BOM, Windows line endings), every summary preset, Copy (normal and blocked), and the phone layout in both themes. One first-run failure was the test reading the file in a way that hides the BOM; the saved file itself was correct.
+
+## 2026-10-18: Simplified Phase 4 (my feedback: too confusing)
+
+**What I said:** the dates in the CSV were messed up, the site was hard to understand, the "line format" made no sense, and adding entries felt faulty. Simplify a lot, and don't use commas in the export, since they looked ugly in Excel.
+
+**What went wrong (Claude's explanation):** everything passed its tests but was too complicated for a person to use.
+- The CSV split dates and times into separate columns.
+- It cut midnight entries into two rows ending at `24:00:00`, which Excel shows oddly.
+- The commas probably appeared because Excel didn't split the columns, which depends on Windows' region settings.
+- Copy summary needed you to learn `{placeholders}`.
+- Adding time needed a date, a start, an end and a midnight checkbox, in a separate tab.
+
+**Changed:** `index.html`, `styles.css`, `app.js`, `CLAUDE.md`.
+- **Back to three tabs:** Today | History | Week. The Add & export tab is gone.
+- **Add time:** a "+ Add time" button at the bottom of Today and History, for the day on screen, opens a small dialog with just three things:
+  - what you worked on
+  - when you started
+  - how long (hours and minutes)
+
+  No end time and no midnight checkbox; going past midnight is handled on its own. Plain messages explain any problem. Adding shows "Added … · Undo", the same popup as delete.
+- **Copy this day as text** (in History, under Share): a title line with the day's total, then one line per task. The only option is a "Use YouTrack format" checkbox, which gives `work 2026-10-17 1h30m Task` lines. The line format and presets are gone.
+- **Download all entries for Excel** replaces the CSV. It's a real `.xlsx` file built in `app.js` (no library), so there are no commas.
+  - Columns: Task | Start | End | Duration. Each start and end is a full date and time that Excel recognises.
+  - Wide columns, a bold frozen header row, and a Total row at the bottom.
+  - Claude checked it by opening the downloaded file in Excel and reading the cells back.
+- **Clearer text:** the timer asks "What are you working on?", and when idle it says "Type what you're working on, then press Start."
+
+**Decisions**
+- The 11 ideas I approved earlier are paused, because they'd add features while we're simplifying. Claude suggests keeping only the tab-title timer, backup and restore, and edit an entry for later.
+- `BUILD-PLAN.md`'s Phase 4 checklist still talks about CSV and end times. It's left as it was; this entry records the change.
+
+**Testing:** 96 checks in headless Chrome, all passing: the dialog (every message, Cancel, Escape, Enter, focus going back), adding to History, Undo of an add, the midnight case, Copy (plain, YouTrack, blocked clipboard, empty day), and the Excel file (unzipped and inspected: header, rows, Total formula, safe text, correct dates and durations). Then Excel itself opened the file and showed:
+
+    Task               | Start              | End                 | Duration
+    Reading, chapter 3 | 2026-10-17 9:00 AM | 2026-10-17 10:30 AM | 1:30:30
+    Night              | 2026-10-17 11:30 PM| 2026-10-18 12:30 AM | 1:00:00
+    Total              |                    |                     | 3:20:30
+
+## 2026-10-18: Bug sweep
+
+**Asked for:** a sweep for bugs across the whole site: what it shows, what it produces (copy text, Excel), and how it takes input.
+
+**How:** Claude read all the code, wrote a reproduction for each suspected bug, and only fixed the ones that actually happened. Then it ran a random-data check and the full test suite.
+
+**Bugs found and fixed** (7 of the 8 suspected bugs were real):
+1. **Deleting the wrong entry.** Entries without an id (for example after editing data by hand) shared a blank id, so deleting one removed another. Now every entry gets its own id when the data loads.
+2. **Bad saved data showed up.** Blank task names appeared as empty rows, and entries ending before they start went into the Excel file with negative durations. These are now ignored when loading, and names are trimmed.
+3. **Undo jumped to the top of the page.** After Undo, focus went to the task box at the top, which on a phone scrolls away and opens the keyboard. Focus now goes back near where you were (the "+ Add time" button in the same tab).
+4. **Misleading copy message.** Copying in YouTrack format on a day where every task is under 30 seconds said "Nothing to copy for this day." It now explains that YouTrack needs at least 1 minute.
+5. **Task box out of step with another tab.** Starting or stopping a timer in another tab didn't update this tab's task box. It does now, unless you're typing in it.
+6. **Backwards entries.** If the computer's clock was changed so a timer's start was in the future, Stop saved an entry that ends before it starts. Now nothing is saved, and a message explains why.
+7. **Errors not read out.** Error messages in the Add time dialog weren't linked to their fields, so screen readers didn't read them. They're linked now.
+
+Also fixed: the header showed "0h 00m" for a moment on load, without the seconds.
+
+**Not a bug:** a daylight-saving day (Nov 1 2026, 25 hours long) is counted correctly.
+
+**Checks**
+- **Random data:** 300 random entries over 10 days (odd seconds, many crossing midnight), tested in two time zones. Every History day total matches an independent calculation, task rows and entries add up to the day total, the week adds up, the header matches, copied text adds up, and the Excel file has 300 rows whose durations and Total match the data.
+- **Full suite:** 96 checks, all passing.
+
+**Noticed, not changed:** deleting an entry that crosses midnight from one day's list deletes the whole entry, so both days' parts go. Its time range shows both dates, so this is visible.
+
+## 2026-10-18: Idea 3, timer in the tab title
+
+**Asked for:** continue with the ideas kept after simplifying (tab-title timer, backup and restore, edit an entry).
+
+**Changed:** `app.js`. While a timer runs, the browser tab's title shows it, for example `12:34 · Studying – Time Tracker`. When stopped, it goes back to `Time Tracker`. It's still right after a reload.
+
+**Known limit:** browsers slow down pages in background tabs. After about 5 minutes hidden, Chrome only lets a page update about once a minute, so the title can be up to a minute behind in a background tab. The recorded time isn't affected.
+
+**Testing:** 4 new checks in headless Chrome (idle title, ticking title, after a reload, after Stop), all passing.
+
+## 2026-10-18: Idea 4, backup and restore
+
+**Why:** the times are saved only in this browser. Clearing browser data or switching laptops would lose them.
+
+**Changed:** `index.html`, `styles.css`, `app.js`. A **Backup** area at the bottom of History, with a one-line explanation:
+- **Download a backup** saves `time-tracker-backup-YYYY-MM-DD.json` with all saved entries.
+- **Restore from a backup** opens a file picker. It **adds** the backup's entries that aren't already here and never deletes anything, so restoring an old backup can't wipe out newer times. It reports what happened ("Restored 3 entries", "Everything in that backup is already here") and offers Undo.
+- A file that isn't a backup is refused with a clear message. Broken entries inside a backup (blank names, impossible times) are skipped, using the same checks as the saved data.
+
+**Decisions**
+- "Already here" means the same task, start and end, not the same id. Testing showed ids alone can clash and wrongly skip an entry. Restored entries get fresh ids.
+- The running timer isn't part of a backup. The message says so if one is running.
+- The Excel download now shares the same download code.
+
+**Testing:** 8 new checks in headless Chrome, all passing: nothing to back up, a real downloaded file, restoring into an empty browser, restoring twice, restoring next to existing data, Undo, a non-backup file, and a backup with broken entries. The first run found the id-clash problem above, which is now fixed.
+
+## 2026-10-18: Idea 5, edit an entry
+
+**Changed:** `app.js`, `styles.css`, `CLAUDE.md`. Every entry, in Today and History, has an **Edit** button. It opens the same small window as Add time, titled "Edit Coding" and filled in with the entry's name, start and length.
+- **Name only:** if just the name changes, the original times are kept exactly, seconds included. A short entry that shows as 0 minutes can still be renamed.
+- **Times:** changing the start or length uses the same checks as adding (not blank, not 0 length, not over 24 hours, not later than now).
+- **After saving:** "Saved changes to … · Undo" appears. Cancel or Escape changes nothing, and focus goes back to the Edit button.
+
+**Decisions**
+- An edited entry stays on its original day; only the time of day can change. To move time to another day, delete it and add it on that day.
+- If the entry was deleted in another tab while the window was open, saving explains that instead of failing silently.
+
+**Testing:** 10 new checks in headless Chrome, all passing: filled-in window, rename keeping seconds, Undo, changing the length, Cancel, blank name, future time, renaming a 20-second entry, editing from History, and the phone layout. The full suite is now **118 checks**, all passing. The tab-order check was updated because Edit buttons are now in the Tab order.

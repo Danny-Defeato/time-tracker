@@ -58,16 +58,30 @@ function loadState() {
   } catch (err) {
     return emptyState();
   }
+  return cleanState(data);
+}
+
+// Turns parsed data (from storage or a backup file) into a safe state.
+function cleanState(data) {
   if (!data || typeof data !== "object") return emptyState();
 
-  const entries = Array.isArray(data.entries)
-    ? data.entries.filter((e) =>
-        e && typeof e.task === "string" && isValidTime(e.start) && isValidTime(e.end))
-    : [];
+  // Keep only entries that make sense (data may have been edited by hand): a non-blank
+  // name, real times, and an end after the start. Every entry needs its own id, or
+  // deleting one could remove another.
+  const seenIds = new Set();
+  const entries = [];
+  for (const e of Array.isArray(data.entries) ? data.entries : []) {
+    if (!e || typeof e.task !== "string" || !e.task.trim()) continue;
+    if (!isValidTime(e.start) || !isValidTime(e.end) || Date.parse(e.end) <= Date.parse(e.start)) continue;
+    let id = typeof e.id === "string" && e.id ? e.id : newId();
+    while (seenIds.has(id)) id = newId();
+    seenIds.add(id);
+    entries.push({ id, task: e.task.trim(), start: e.start, end: e.end });
+  }
 
   const r = data.running;
-  const running = r && typeof r.task === "string" && isValidTime(r.start)
-    ? { task: r.task, start: r.start }
+  const running = r && typeof r.task === "string" && r.task.trim() && isValidTime(r.start)
+    ? { task: r.task.trim(), start: r.start }
     : null;
 
   return { entries, running };
@@ -121,8 +135,15 @@ function stopTimer() {
   if (!state.running) return;
   const { task, start } = state.running;
   const end = new Date().toISOString();
-  state.entries.push({ id: newId(), task, start, end });
   state.running = null;
+  if (Date.parse(end) <= Date.parse(start)) {
+    // The start is in the future (the computer's clock was changed), so there's no time to save.
+    saveState();
+    setStatus("Nothing saved for " + task + ": its start time was later than now. Was the clock changed?");
+    render();
+    return;
+  }
+  state.entries.push({ id: newId(), task, start, end });
   saveState();
   setStatus("Saved: " + task + ", " + formatDuration(Date.parse(end) - Date.parse(start)));
   render();
@@ -329,29 +350,26 @@ for (const tab of tabs) {
   });
 }
 
-// ---------- Delete and undo ----------
+// ---------- Undo popup ----------
 
 const UNDO_MS = 6000;
-let lastDeleted = null; // { entry, index }
+let undoAction = null; // what the Undo button does right now
 let undoTimeout = null;
+let undoReturnFocus = null; // where focus goes when the popup closes
 
-function deleteEntry(id) {
-  const index = state.entries.findIndex((e) => e.id === id);
-  if (index === -1) return;
-  const [entry] = state.entries.splice(index, 1);
-  saveState();
-  render();
-
-  lastDeleted = { entry, index };
-  undoText.textContent = "Deleted " + entry.task + ", " +
-    formatDuration(Date.parse(entry.end) - Date.parse(entry.start));
+// Shows "message · Undo" for a few seconds. Used after deleting and after adding time.
+// `returnFocus` is where focus should go afterwards (near what the person was doing).
+function showUndo(message, undo, returnFocus) {
+  undoAction = undo;
+  undoReturnFocus = returnFocus || null;
+  undoText.textContent = message;
   undoToast.hidden = false;
   undoButton.focus();
   clearTimeout(undoTimeout);
   undoTimeout = setTimeout(hideUndoIfIdle, UNDO_MS);
 }
 
-// Don't pull the toast away while someone is about to press Undo.
+// Don't pull the popup away while someone is about to press Undo.
 function hideUndoIfIdle() {
   if (undoToast.contains(document.activeElement) || undoToast.matches(":hover")) {
     undoTimeout = setTimeout(hideUndoIfIdle, 1000);
@@ -364,18 +382,39 @@ function hideUndo() {
   clearTimeout(undoTimeout);
   const hadFocus = undoToast.contains(document.activeElement);
   undoToast.hidden = true;
-  lastDeleted = null;
-  if (hadFocus) taskInput.focus();
+  undoAction = null;
+  // Go back near where the person was, not to the task box at the top
+  // (on a phone that would scroll away and open the keyboard).
+  if (hadFocus) {
+    const target = undoReturnFocus && document.contains(undoReturnFocus) && !undoReturnFocus.closest("[hidden]")
+      ? undoReturnFocus
+      : tabs.find((t) => t.getAttribute("aria-selected") === "true");
+    if (target) target.focus();
+  }
 }
 
-function undoDelete() {
-  if (!lastDeleted) return;
-  const { entry, index } = lastDeleted;
-  state.entries.splice(Math.min(index, state.entries.length), 0, entry);
-  saveState();
+function runUndo() {
+  const undo = undoAction;
   hideUndo();
+  if (undo) undo();
+}
+
+function deleteEntry(id) {
+  const index = state.entries.findIndex((e) => e.id === id);
+  if (index === -1) return;
+  // The deleted entry's button disappears, so afterwards focus goes to the
+  // "+ Add time" button in the same tab.
+  const panel = document.activeElement && document.activeElement.closest('[role="tabpanel"]');
+  const returnFocus = panel && panel.querySelector(".secondary-button");
+  const [entry] = state.entries.splice(index, 1);
+  saveState();
   render();
-  setStatus("Restored " + entry.task);
+  showUndo("Deleted " + entry.task + ", " + formatDuration(Date.parse(entry.end) - Date.parse(entry.start)), () => {
+    state.entries.splice(Math.min(index, state.entries.length), 0, entry);
+    saveState();
+    render();
+    setStatus("Restored " + entry.task);
+  }, returnFocus);
 }
 
 // ---------- Rendering ----------
@@ -534,7 +573,14 @@ function renderEntries(list, day) {
       del.setAttribute("aria-label", "Delete " + e.task + ", " + range);
       del.addEventListener("click", () => deleteEntry(e.id));
 
-      li.append(dot, task, time, duration, del);
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "edit-button";
+      edit.textContent = "Edit";
+      edit.setAttribute("aria-label", "Edit " + e.task + ", " + range);
+      edit.addEventListener("click", () => openEditDialog(e));
+
+      li.append(dot, task, time, duration, edit, del);
       return li;
     })
   );
@@ -552,6 +598,7 @@ function historyDay() {
 
 function showHistoryDay(key) {
   historyKey = key;
+  resetCopy();
   historyDateInput.value = key;
   renderHistory();
 }
@@ -643,6 +690,10 @@ function updateWeekNumbers(data) {
 // Rows with buttons only get new text and widths here, so focus isn't disturbed.
 function renderLive(totals) {
   clock.textContent = formatClock(elapsedMs());
+  // The running timer in the browser tab's title, so it's visible from other tabs.
+  document.title = state.running
+    ? formatClock(elapsedMs()) + " · " + state.running.task + " – Time Tracker"
+    : "Time Tracker";
   todayTotalText.textContent = formatSeconds(sumSeconds(totals));
   updateRowNumbers(taskRows, totals);
   if (historyKey === dateKey(Date.now())) renderHistoryRows();
@@ -654,7 +705,7 @@ function render() {
     runningTaskText.textContent = "Tracking: " + state.running.task;
     stopButton.disabled = false;
   } else {
-    runningTaskText.textContent = "No timer running";
+    runningTaskText.textContent = "Type what you're working on, then press Start.";
     stopButton.disabled = true;
   }
   const day = dayRange(Date.now());
@@ -695,6 +746,446 @@ function scheduleTick() {
   tickTimeout = setTimeout(tick, delay);
 }
 
+// ---------- Add time ----------
+
+const addDialog = document.getElementById("add-dialog");
+const addForm = document.getElementById("add-form");
+const addTitle = document.getElementById("add-title");
+const addTask = document.getElementById("add-task");
+const addStart = document.getElementById("add-start");
+const addHours = document.getElementById("add-hours");
+const addMinutes = document.getElementById("add-minutes");
+const addMessage = document.getElementById("add-message");
+const addCancel = document.getElementById("add-cancel");
+const addTodayButton = document.getElementById("add-today-button");
+const addHistoryButton = document.getElementById("add-history-button");
+
+const addSave = document.getElementById("add-save");
+
+const MAX_ENTRY_MS = 24 * 60 * 60 * 1000;
+let addDay = null; // the day the dialog adds time to (for an edit: the entry's start day)
+let addOpener = null; // where focus goes back to when the dialog closes
+let editingId = null; // the entry being edited, or null when adding
+let timesChanged = false; // in edit mode: did the person touch the start or length?
+
+function showFormMessage(el, text, isError) {
+  el.textContent = text;
+  el.classList.toggle("error", Boolean(isError));
+}
+
+// "Saturday, October 17", or "today".
+function dayName(day) {
+  if (day.start === dayRange(Date.now()).start) return "today";
+  return new Date(day.start).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+
+function openDialog(title, saveLabel, values) {
+  addOpener = document.activeElement;
+  addTitle.textContent = title;
+  addSave.textContent = saveLabel;
+  addTask.value = values.task;
+  addStart.value = values.start;
+  addHours.value = String(values.hours);
+  addMinutes.value = String(values.minutes);
+  timesChanged = false;
+  showFormMessage(addMessage, "");
+  for (const input of [addTask, addStart, addHours, addMinutes]) input.removeAttribute("aria-invalid");
+  addDialog.showModal();
+  addTask.focus();
+}
+
+function openAddDialog(day) {
+  addDay = day;
+  editingId = null;
+  openDialog("Add time to " + dayName(day), "Add", { task: "", start: "", hours: 0, minutes: 0 });
+}
+
+function openEditDialog(entry) {
+  const startMs = Date.parse(entry.start);
+  const lengthMinutes = Math.round((Date.parse(entry.end) - startMs) / 60000);
+  const d = new Date(startMs);
+  addDay = dayRange(startMs);
+  editingId = entry.id;
+  openDialog("Edit " + entry.task, "Save", {
+    task: entry.task,
+    start: pad2(d.getHours()) + ":" + pad2(d.getMinutes()),
+    hours: Math.floor(lengthMinutes / 60),
+    minutes: lengthMinutes % 60,
+  });
+}
+
+// A whole number from a number box ("" counts as 0), or null if it isn't one.
+function wholeNumber(input) {
+  const text = input.value.trim();
+  if (text === "") return 0;
+  return /^\d+$/.test(text) ? Number(text) : null;
+}
+
+// Handles both adding and editing (editingId set).
+function saveAddedTime() {
+  const fail = (field, text) => {
+    showFormMessage(addMessage, text, true);
+    for (const input of [addTask, addStart, addHours, addMinutes]) input.setAttribute("aria-invalid", String(input === field));
+    field.focus();
+  };
+  const original = editingId && state.entries.find((e) => e.id === editingId);
+  if (editingId && !original) {
+    addDialog.close();
+    setStatus("That entry was deleted in another tab, so there was nothing to save.");
+    return;
+  }
+
+  const task = addTask.value.trim();
+  if (!task) return fail(addTask, "Type what you worked on.");
+
+  let startMs;
+  let endMs;
+  if (original && !timesChanged) {
+    // Only the name changed: keep the exact times (including seconds).
+    startMs = Date.parse(original.start);
+    endMs = Date.parse(original.end);
+  } else {
+    const match = /^(\d{2}):(\d{2})/.exec(addStart.value);
+    if (!match) return fail(addStart, "Enter the time you started.");
+    const d = new Date(addDay.start);
+    startMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Number(match[1]), Number(match[2])).getTime();
+
+    const hours = wholeNumber(addHours);
+    const minutes = wholeNumber(addMinutes);
+    if (hours === null) return fail(addHours, "Hours must be a whole number.");
+    if (minutes === null || minutes > 59) return fail(addMinutes, "Minutes must be a whole number from 0 to 59.");
+    const lengthMs = (hours * 60 + minutes) * 60000;
+    if (lengthMs === 0) return fail(addMinutes, "Enter how long you worked.");
+    if (lengthMs > MAX_ENTRY_MS) return fail(addHours, "That's longer than 24 hours.");
+
+    endMs = startMs + lengthMs;
+    if (endMs > Date.now()) return fail(addStart, "That would end later than now. Check the start time and length.");
+  }
+
+  const start = new Date(startMs).toISOString();
+  const end = new Date(endMs).toISOString();
+  // Undo goes back to the "+ Add time" button in the same tab (an edited entry's
+  // own button is rebuilt, so it can't keep focus).
+  const panel = addOpener && addOpener.closest('[role="tabpanel"]');
+  const returnFocus = panel ? panel.querySelector(".secondary-button") : addOpener;
+
+  if (original) {
+    const before = { ...original };
+    Object.assign(original, { task, start, end });
+    saveState();
+    addDialog.close();
+    render();
+    showUndo("Saved changes to " + task, () => {
+      const current = state.entries.find((e) => e.id === before.id);
+      if (current) Object.assign(current, before);
+      saveState();
+      render();
+    }, returnFocus);
+    return;
+  }
+
+  const entry = { id: newId(), task, start, end };
+  state.entries.push(entry);
+  saveState();
+  addDialog.close();
+  render();
+  showUndo("Added " + task + ", " + formatDuration(endMs - startMs), () => {
+    state.entries = state.entries.filter((e) => e.id !== entry.id);
+    saveState();
+    render();
+  }, returnFocus);
+}
+
+// ---------- Copy this day ----------
+
+const copyButton = document.getElementById("copy-button");
+const youtrackCheck = document.getElementById("youtrack-check");
+const copyMessage = document.getElementById("copy-message");
+const copyFallback = document.getElementById("copy-fallback");
+
+// "1h30m", "45m", "2h": the duration style YouTrack's docs use.
+function formatHm(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return m + "m";
+  return h + "h" + (m ? m + "m" : "");
+}
+
+// Plain:    "Saturday, October 17: 2h 00m 00s" then "Coding: 1h 00m 00s" lines.
+// YouTrack: "work 2026-10-17 1h30m Coding" lines (tasks under 30 seconds are left out,
+//           because YouTrack can't log 0 minutes).
+function dayText(day, youtrack) {
+  const totals = dayTotals(day);
+  const tasks = byMostTime(totals);
+  if (youtrack) {
+    return tasks
+      .filter((task) => Math.round(totals.get(task) / 60) > 0)
+      .map((task) => "work " + dateKey(day.start) + " " + formatHm(Math.round(totals.get(task) / 60)) + " " + task)
+      .join("\n");
+  }
+  if (tasks.length === 0) return "";
+  const title = new Date(day.start).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  return [title + ": " + formatSeconds(sumSeconds(totals)), ...tasks.map((task) => task + ": " + formatSeconds(totals.get(task)))].join("\n");
+}
+
+function resetCopy() {
+  showFormMessage(copyMessage, "");
+  copyFallback.hidden = true;
+}
+
+async function copyDay() {
+  resetCopy();
+  const text = dayText(historyDay(), youtrackCheck.checked);
+  if (!text) {
+    const nothingTracked = dayTotals(historyDay()).size === 0;
+    showFormMessage(copyMessage, nothingTracked
+      ? "Nothing to copy for this day."
+      : "Nothing to copy: every task is under 30 seconds, and YouTrack needs at least 1 minute.", true);
+    return;
+  }
+  const lineCount = text.split("\n").length;
+  const done = () => showFormMessage(copyMessage, "Copied " + lineCount + (lineCount === 1 ? " line." : " lines.") + " Paste it wherever you need it.");
+  try {
+    await navigator.clipboard.writeText(text);
+    done();
+  } catch (err) {
+    // Some browsers block the clipboard on pages opened as a file. Try the older
+    // copy command on a visible box; if that fails too, leave the text selected.
+    copyFallback.value = text;
+    copyFallback.hidden = false;
+    copyFallback.focus();
+    copyFallback.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (err2) {
+      copied = false;
+    }
+    if (copied) {
+      copyFallback.hidden = true;
+      copyButton.focus();
+      done();
+    } else {
+      showFormMessage(copyMessage, "Your browser blocked copying. The text below is selected: press Ctrl+C (or ⌘C).", true);
+    }
+  }
+}
+
+// ---------- Excel download ----------
+
+const exportButton = document.getElementById("export-button");
+const exportMessage = document.getElementById("export-message");
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+// An .xlsx file is a zip of a few XML files. This writes an uncompressed zip.
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (const b of bytes) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function zipBlob(files, type) {
+  const encoder = new TextEncoder();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const data = encoder.encode(file.text);
+    const crc = crc32(data);
+
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true); // local file header
+    local.setUint16(4, 20, true);         // version needed
+    local.setUint16(12, 0x21, true);      // date: 1980-01-01
+    local.setUint32(14, crc, true);
+    local.setUint32(18, data.length, true);
+    local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    parts.push(local, name, data);
+
+    const entry = new DataView(new ArrayBuffer(46));
+    entry.setUint32(0, 0x02014b50, true); // central directory header
+    entry.setUint16(4, 20, true);
+    entry.setUint16(6, 20, true);
+    entry.setUint16(14, 0x21, true);
+    entry.setUint32(16, crc, true);
+    entry.setUint32(20, data.length, true);
+    entry.setUint32(24, data.length, true);
+    entry.setUint16(28, name.length, true);
+    entry.setUint32(42, offset, true);
+    central.push(entry, name);
+
+    offset += 30 + name.length + data.length;
+  }
+  const centralSize = central.reduce((sum, part) => sum + part.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); // end of central directory
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end], { type });
+}
+
+function xmlText(text) {
+  return String(text)
+    .replace(/[^\t\n\r -퟿-�]/g, "") // characters XML can't hold
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Excel stores a date-time as days since 1899-12-30, in local time.
+function excelDate(ms) {
+  const d = new Date(ms);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()) / 86400000 + 25569;
+}
+
+// Columns: Task | Start | End | Duration, one row per entry, oldest first, then a Total row.
+// Cell styles (see styles.xml below): 1 = date-time, 2 = duration, 3 = bold, 4 = bold duration.
+function buildWorkbook(entries) {
+  const textCell = (ref, text, style) =>
+    `<c r="${ref}" t="inlineStr"${style ? ` s="${style}"` : ""}><is><t xml:space="preserve">${xmlText(text)}</t></is></c>`;
+  const numberCell = (ref, value, style) => `<c r="${ref}" s="${style}"><v>${value}</v></c>`;
+
+  const rows = [`<row r="1">${textCell("A1", "Task", 3)}${textCell("B1", "Start", 3)}${textCell("C1", "End", 3)}${textCell("D1", "Duration", 3)}</row>`];
+  let totalDays = 0;
+  entries.forEach((e, i) => {
+    const r = i + 2;
+    const startMs = Date.parse(e.start);
+    const endMs = Date.parse(e.end);
+    const lengthDays = Math.round((endMs - startMs) / 1000) / 86400;
+    totalDays += lengthDays;
+    rows.push(`<row r="${r}">${textCell("A" + r, e.task)}${numberCell("B" + r, excelDate(startMs), 1)}` +
+      `${numberCell("C" + r, excelDate(endMs), 1)}${numberCell("D" + r, lengthDays, 2)}</row>`);
+  });
+  const t = entries.length + 2;
+  rows.push(`<row r="${t}">${textCell("A" + t, "Total", 3)}` +
+    `<c r="D${t}" s="4"><f>SUM(D2:D${t - 1})</f><v>${totalDays}</v></c></row>`);
+
+  const main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  return [
+    { name: "[Content_Types].xml", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+    { name: "_rels/.rels", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: "xl/workbook.xml", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="${main}" xmlns:r="${rel}"><sheets><sheet name="Time entries" sheetId="1" r:id="rId1"/></sheets><calcPr fullCalcOnLoad="1"/></workbook>` },
+    { name: "xl/_rels/workbook.xml.rels", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${rel}/styles" Target="styles.xml"/></Relationships>` },
+    { name: "xl/styles.xml", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="${main}"><numFmts count="2"><numFmt numFmtId="164" formatCode="yyyy-mm-dd h:mm AM/PM"/><numFmt numFmtId="165" formatCode="[h]:mm:ss"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>` },
+    { name: "xl/worksheets/sheet1.xml", text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="${main}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="34" customWidth="1"/><col min="2" max="3" width="22" customWidth="1"/><col min="4" max="4" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData></worksheet>` },
+  ];
+}
+
+function exportExcel() {
+  const entries = state.entries.slice().sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  if (entries.length === 0) {
+    showFormMessage(exportMessage, "Nothing to download yet.", true);
+    return;
+  }
+  downloadFile(zipBlob(buildWorkbook(entries), XLSX_TYPE), "time-tracker-" + dateKey(Date.now()) + ".xlsx");
+  showFormMessage(exportMessage, "Downloaded " + entries.length + (entries.length === 1 ? " entry." : " entries.") +
+    (state.running ? " The running timer is added once you stop it." : ""));
+}
+
+// ---------- Backup and restore ----------
+
+const backupButton = document.getElementById("backup-button");
+const restoreButton = document.getElementById("restore-button");
+const restoreInput = document.getElementById("restore-input");
+const backupMessage = document.getElementById("backup-message");
+const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+
+function downloadFile(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// A backup is the saved entries as JSON. The running timer isn't included.
+function downloadBackup() {
+  if (state.entries.length === 0) {
+    showFormMessage(backupMessage, "Nothing to back up yet.", true);
+    return;
+  }
+  const backup = { app: "time-tracker", version: 1, saved: new Date().toISOString(), entries: state.entries };
+  downloadFile(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }),
+    "time-tracker-backup-" + dateKey(Date.now()) + ".json");
+  showFormMessage(backupMessage, "Downloaded a backup of " + state.entries.length +
+    (state.entries.length === 1 ? " entry." : " entries.") +
+    (state.running ? " The running timer is included once you stop it." : ""));
+}
+
+// Restoring adds the backup's entries that aren't here yet. It never deletes
+// anything, so restoring an old backup can't wipe out newer times.
+async function restoreBackup(file) {
+  restoreInput.value = ""; // so picking the same file again still works
+  if (!file) return;
+  if (file.size > MAX_BACKUP_BYTES) {
+    showFormMessage(backupMessage, "That file is too big to be a Time Tracker backup.", true);
+    return;
+  }
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (err) {
+    data = null;
+  }
+  if (!data || data.app !== "time-tracker" || !Array.isArray(data.entries)) {
+    showFormMessage(backupMessage, "That file isn't a Time Tracker backup. Pick a file named like time-tracker-backup-….json.", true);
+    return;
+  }
+
+  // An entry counts as "already here" when its task and times match one here
+  // (ids alone could clash). Restored entries get fresh ids.
+  const incoming = cleanState({ entries: data.entries }).entries;
+  const same = new Set(state.entries.map((e) => e.task + "|" + Date.parse(e.start) + "|" + Date.parse(e.end)));
+  const added = [];
+  for (const e of incoming) {
+    const key = e.task + "|" + Date.parse(e.start) + "|" + Date.parse(e.end);
+    if (same.has(key)) continue;
+    same.add(key);
+    added.push({ ...e, id: newId() });
+  }
+
+  if (added.length === 0) {
+    showFormMessage(backupMessage, incoming.length
+      ? "Everything in that backup is already here. Nothing changed."
+      : "That backup has no entries in it.");
+    return;
+  }
+  const before = state.entries.slice();
+  state.entries.push(...added);
+  saveState();
+  render();
+  showFormMessage(backupMessage, "Restored " + added.length + (added.length === 1 ? " entry" : " entries") +
+    " from the backup" + (incoming.length > added.length ? " (" + (incoming.length - added.length) + " were already here)." : "."));
+  showUndo("Restored " + added.length + (added.length === 1 ? " entry" : " entries"), () => {
+    state.entries = before;
+    saveState();
+    render();
+    showFormMessage(backupMessage, "Restore undone.");
+  }, restoreButton);
+}
+
 // ---------- Events ----------
 
 form.addEventListener("submit", (event) => {
@@ -708,7 +1199,28 @@ stopButton.addEventListener("click", () => {
 });
 
 themeButton.addEventListener("click", cycleTheme);
-undoButton.addEventListener("click", undoDelete);
+undoButton.addEventListener("click", runUndo);
+
+addTodayButton.addEventListener("click", () => openAddDialog(dayRange(Date.now())));
+addHistoryButton.addEventListener("click", () => openAddDialog(historyDay()));
+addCancel.addEventListener("click", () => addDialog.close());
+for (const input of [addStart, addHours, addMinutes]) {
+  input.addEventListener("input", () => { timesChanged = true; });
+}
+addDialog.addEventListener("close", () => {
+  if (addOpener && document.contains(addOpener) && undoToast.hidden) addOpener.focus();
+});
+addForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveAddedTime();
+});
+
+copyButton.addEventListener("click", copyDay);
+youtrackCheck.addEventListener("change", resetCopy);
+exportButton.addEventListener("click", exportExcel);
+backupButton.addEventListener("click", downloadBackup);
+restoreButton.addEventListener("click", () => restoreInput.click());
+restoreInput.addEventListener("change", () => restoreBackup(restoreInput.files[0]));
 
 historyDateInput.addEventListener("change", () => {
   const key = historyDateInput.value;
@@ -732,7 +1244,12 @@ window.addEventListener("storage", (event) => {
     return;
   }
   if (event.key !== STORAGE_KEY && event.key !== null) return;
+  const wasRunning = state.running && state.running.task;
   state = loadState();
+  // Keep the task box in step with a timer started or stopped in the other tab,
+  // unless the person is typing in it.
+  const nowRunning = state.running && state.running.task;
+  if (nowRunning !== wasRunning && document.activeElement !== taskInput) taskInput.value = nowRunning || "";
   render();
 });
 

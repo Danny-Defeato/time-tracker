@@ -30,7 +30,7 @@ Artifact 2 ("something you will use").
 - One `localStorage` key, `timeTracker.v1`, holding JSON:
   `{ "entries": [ { "id", "task", "start", "end" } ], "running": { "task", "start" } | null }`
 - A second key, `timeTracker.theme`, holds only the theme choice: `"auto"`, `"light"` or `"dark"`.
-  It's kept separate so the time data and CSV export stay clean.
+  It's kept separate so the time data and the Excel download stay clean.
 - `start` / `end` are ISO timestamps. A running timer stores only its start time,
   and elapsed time is always computed as now minus start (never by counting ticks),
   so a reload or a sleeping laptop doesn't lose time.
@@ -38,7 +38,7 @@ Artifact 2 ("something you will use").
   stops and saves the running one first.
 - An entry that crosses midnight counts toward each day for the part that falls on it.
   Do this split in one shared helper used by Today, History, the 7-day summary and
-  the CSV export, so their numbers always agree.
+  the copy feature, so their numbers always agree.
 - Totals are built from whole seconds: each entry's part of a day is rounded to the
   nearest second, and every total is a sum of those. So rows add up to the day total
   and days add up to the week total exactly.
@@ -58,13 +58,27 @@ Artifact 2 ("something you will use").
    in the same layout as Today, but with no ▶ buttons; delete with Undo works there too.
    "Last 7 days" (today and the 6 days before): total per day with a bar relative to the
    busiest day (clicking a day opens it in History), total per task, and a week total.
-4. Manual entry (task, date, start and end time) for time I forgot to track;
-   reject an end time before the start. "Export CSV" downloads all entries with
-   columns `task, date, start, end, minutes`, quoting fields that contain commas.
-   "Copy summary" copies one line per task for a chosen day to the clipboard, using a
-   format with `{date}`, `{task}`, `{duration}`, `{minutes}` placeholders. Presets:
-   plain list (default), YouTrack `work` command (`work {date} 1h30m {task}`),
-   spreadsheet (tab-separated), and custom. Nothing is sent anywhere; the user pastes it.
+4. Add time I forgot to track: an "+ Add time" button on Today and on History (for the
+   day shown) opens a small dialog with just: what (task), started at (time), and how long
+   (hours + minutes). No end time or midnight checkbox; if it runs past midnight the split
+   happens automatically. Refuse empty fields, 0 length, over 24 hours, or ending after now.
+   Adding shows "Added … · Undo".
+   History has a Share area: "Copy this day as text" (a title line with the day total, then
+   "Task: 1h 05m 09s" lines) with one option, a "Use YouTrack format" checkbox
+   (`work 2026-10-17 1h30m Task` lines; tasks under 30 seconds left out). If the clipboard is
+   blocked, show the text selected for Ctrl+C. And "Download all entries for Excel": a real
+   .xlsx file (built in app.js, no library) with columns Task | Start | End | Duration, one
+   row per entry with full date-times, a bold header and a Total row. No CSV: commas
+   showed up in my Excel. Keep these features simple: no templates or format options.
+
+5. Extras (kept after simplifying): the running timer shows in the browser tab title
+   (`12:34 · Task – Time Tracker`). Every entry has an Edit button that opens the same
+   dialog as Add time, filled in; changing only the name keeps the exact times. History has
+   a Backup area: "Download a backup" (a .json file of all entries) and "Restore from a
+   backup", which only adds entries that aren't already here (same task, start and end),
+   never deletes, and offers Undo.
+- Saved data and backups are cleaned on load: names trimmed, blank names and entries
+   that end before they start are skipped, and every entry gets its own id.
 
 ## Style
 
@@ -75,7 +89,7 @@ Artifact 2 ("something you will use").
   same name always has the same colour. It's used for its row stripe, bar and entry dot.
   Palette colours must be readable in both themes.
 - Durations shown as `1h 05m 09s` (and `mm:ss` on the live timer).
-- Layout: header, then the Timer (always visible), then tabs: Today | History | Last 7 days.
+- Layout: header, then the Timer (always visible), then tabs: Today | History | Week.
   The page opens on Today. Tabs work with arrow keys, Home and End.
 - Buttons and inputs must work with the keyboard and have visible focus.
 
