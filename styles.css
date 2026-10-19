@@ -383,6 +383,57 @@ button:focus-visible {
   color: var(--text);
 }
 
+/* ---------- History and last 7 days ---------- */
+
+.section-total {
+  margin: 0.75rem 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-total strong {
+  color: var(--text);
+}
+
+.week-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.week-days li {
+  padding: 0.15rem 0 0.5rem;
+}
+
+.week-day {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.week-day:hover {
+  border-color: var(--border);
+}
+
+.week-day-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.week-days .share-bar {
+  margin: 0 0.5rem;
+}
+
+.week-fill {
+  background: var(--accent);
+}
+
 /* ---------- Undo toast ---------- */
 
 .toast {

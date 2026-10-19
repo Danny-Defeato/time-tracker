@@ -60,6 +60,29 @@
       <p id="entries-empty" class="empty">No entries yet today.</p>
       <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
     </section>
+
+    <section aria-labelledby="history-heading">
+      <h2 id="history-heading">History</h2>
+      <label for="history-date">Day</label>
+      <input id="history-date" type="date">
+      <p class="section-total">Total <strong id="history-total">0h 00m</strong></p>
+      <p id="history-empty" class="empty">Nothing tracked on this day.</p>
+      <ul id="history-rows" class="task-rows"></ul>
+      <div id="history-entries-block">
+        <h3 id="history-entries-heading">Entries</h3>
+        <ul id="history-entries" class="entry-list" aria-labelledby="history-entries-heading"></ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="week-heading">
+      <h2 id="week-heading">Last 7 days</h2>
+      <p class="section-total">Total <strong id="week-total">0h 00m</strong></p>
+      <h3 id="week-days-heading">By day</h3>
+      <ul id="week-days" class="week-days" aria-labelledby="week-days-heading"></ul>
+      <h3 id="week-tasks-heading">By task</h3>
+      <p id="week-empty" class="empty">Nothing tracked in the last 7 days.</p>
+      <ul id="week-tasks" class="task-rows" aria-labelledby="week-tasks-heading"></ul>
+    </section>
   </main>
 
   <div id="undo-toast" class="toast" role="status" hidden>

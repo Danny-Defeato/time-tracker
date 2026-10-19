@@ -96,3 +96,29 @@ What I set out to build, what I asked the agent for, what I decided, and what I 
 - `BUILD-PLAN.md`'s Phase 2 checklist still says delete "asks first". That's now replaced by Undo. I left that file as it was.
 
 **Testing:** Claude ran 46 checks in headless Chrome. They covered feature 1 again, totals, order, bars, ▶/■ (including by keyboard), delete and Undo, the midnight split, the midnight rollover (using a fake clock set to 23:59:57), the theme button, phone width, corrupt data and blocked storage. All passed. The first run had one failure, caused by a mistake in the test itself (it created test data while the fake clock was still on).
+
+## 2026-10-18: Feature 3, History and last 7 days (plus YouTrack planning)
+
+**Asked for:** start Phase 3, and work out how export could help with YouTrack, which another class uses for tracking work. I went with Claude's suggestions. I also asked for the YouTrack helper to be generic, so it's useful for other things too.
+
+**YouTrack research and decision (for Phase 4)**
+- YouTrack logs time per issue as a "work item": a date, a duration and an optional comment. You add one with the Add spent time form, or with the `work` command (`work 2026-10-18 1h30m description`). The docs don't show a way to import time from a file.
+- Plan: start task names with the issue ID (for example `CS490-12 Login page`). Phase 4 adds a generic **Copy summary** button: one line per task for a chosen day, using a format with `{date}`, `{task}`, `{duration}` and `{minutes}` placeholders. It has presets for a plain list, YouTrack `work` commands and spreadsheets, plus a custom option. Added to `CLAUDE.md` feature 4.
+- **Rejected:** sending time to YouTrack automatically through its API. It would mean storing a login token in the browser and sending data to a server, which breaks the "nothing is sent anywhere" rule. It also may not work from GitHub Pages at all.
+
+**Changed:** `index.html`, `styles.css`, `app.js`, `CLAUDE.md`.
+- **History:** a date picker (starts on yesterday, can't go past today) showing that day's task rows, share bars, total and entries. Same layout as Today but with no ▶ buttons. Delete with Undo works. An empty day says "Nothing tracked on this day."
+- **Last 7 days:** today plus the 6 days before.
+  - Each day shows its total and a bar relative to the busiest day. Clicking a day opens it in History.
+  - Each task shows its week total, most first.
+  - The week total is shown at the top.
+- Today's numbers in History and the week update live while a timer runs, and match the Today section.
+
+**Fix found while planning:** totals could disagree by a minute, because each number was rounded down separately. For example, two 30-second entries showed 0m each but 1m in total. Now each entry's part of a day is rounded to the nearest minute, and every total adds those up. Rows add up to the day total and days add up to the week total exactly. The live clock still shows seconds. Added to `CLAUDE.md`.
+
+**Decisions**
+- "Last 7 days" is a rolling window ending today, not Monday to Sunday (as in `BUILD-PLAN.md`).
+- A future date typed into History is pulled back to today. Clearing the date keeps the last day shown.
+- Rows without buttons (History and the week) are rebuilt every second. Rows with buttons only get their numbers updated, so keyboard focus is never lost.
+
+**Testing:** Claude ran 64 checks in headless Chrome covering features 1–3, all passing. The new checks covered the History default and limits, the midnight split on both days, empty days, week totals adding up, clicking a day, delete and Undo from History, whole-minute rounding, live updates, and the phone layout. The first run had 5 failures, all from the test clicking things outside the visible part of the now-taller page. Fixed by scrolling to each element before clicking, as a real user would.

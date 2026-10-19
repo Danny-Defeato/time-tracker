@@ -21,6 +21,16 @@ const entryList = document.getElementById("entry-list");
 const undoToast = document.getElementById("undo-toast");
 const undoText = document.getElementById("undo-text");
 const undoButton = document.getElementById("undo-button");
+const historyDateInput = document.getElementById("history-date");
+const historyTotalText = document.getElementById("history-total");
+const historyEmpty = document.getElementById("history-empty");
+const historyRows = document.getElementById("history-rows");
+const historyEntriesBlock = document.getElementById("history-entries-block");
+const historyEntries = document.getElementById("history-entries");
+const weekTotalText = document.getElementById("week-total");
+const weekDays = document.getElementById("week-days");
+const weekEmpty = document.getElementById("week-empty");
+const weekTasks = document.getElementById("week-tasks");
 
 // ---------- Storage ----------
 
@@ -141,18 +151,59 @@ function msOnDay(startMs, endMs, day) {
   return Math.max(0, Math.min(endMs, day.end) - Math.max(startMs, day.start));
 }
 
-// Time per task on a day, including the running timer up to now.
+// An entry's part of a day in whole minutes (nearest). Every total is a sum of
+// these, so rows add up to day totals and days add up to the week total exactly.
+function minutesOnDay(startMs, endMs, day) {
+  return Math.round(msOnDay(startMs, endMs, day) / 60000);
+}
+
+// Minutes per task on a day, including the running timer up to now. A task is
+// included if it has any time on the day, even if that rounds to 0 minutes.
 function dayTotals(day) {
   const totals = new Map();
-  const add = (task, ms) => totals.set(task, (totals.get(task) || 0) + ms);
+  const add = (task, minutes) => totals.set(task, (totals.get(task) || 0) + minutes);
   for (const e of state.entries) {
-    const ms = msOnDay(Date.parse(e.start), Date.parse(e.end), day);
-    if (ms > 0) add(e.task, ms);
+    const startMs = Date.parse(e.start);
+    const endMs = Date.parse(e.end);
+    if (msOnDay(startMs, endMs, day) > 0) add(e.task, minutesOnDay(startMs, endMs, day));
   }
   if (state.running) {
-    add(state.running.task, msOnDay(Date.parse(state.running.start), Date.now(), day));
+    // Included from the moment it starts, so its row appears straight away.
+    const startMs = Date.parse(state.running.start);
+    const now = Date.now();
+    if (startMs < day.end && now >= day.start) add(state.running.task, minutesOnDay(startMs, now, day));
   }
   return totals;
+}
+
+function sumMinutes(totals) {
+  let sum = 0;
+  for (const minutes of totals.values()) sum += minutes;
+  return sum;
+}
+
+// The 7 days ending today, oldest first.
+function lastSevenDays() {
+  const now = new Date();
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    days.push(dayRange(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime()));
+  }
+  return days;
+}
+
+// "2026-10-18" for the local day containing `ms` (the format date inputs use).
+function dateKey(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+// The day for a "2026-10-18" key, or null if it isn't a real date.
+function dayFromKey(key) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || "");
+  if (!match) return null;
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(d.getTime()) ? null : dayRange(d.getTime());
 }
 
 // Saved entries that have any time on the day, newest first.
@@ -179,10 +230,14 @@ function formatClock(ms) {
 }
 
 // Durations: "1h 05m".
-function formatDuration(ms) {
-  const totalMinutes = Math.floor(Math.max(0, ms) / 60000);
+function formatMinutes(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60);
   return hours + "h " + pad2(totalMinutes % 60) + "m";
+}
+
+// Rounded to the nearest minute, like the totals.
+function formatDuration(ms) {
+  return formatMinutes(Math.round(Math.max(0, ms) / 60000));
 }
 
 // "9:05 AM", with the date in front when it isn't on `day` ("Oct 17, 11:30 PM").
@@ -331,10 +386,12 @@ function todayRowOrder(totals) {
 let renderedOrder = "";
 let renderedDayStart = 0;
 
-function makeTaskRow(name, isToday) {
-  const running = state.running && state.running.task === name;
+// One task row. Options: `button` adds ▶/■, `dimmed` greys it out (no bar),
+// otherwise it gets a bar showing its share of the list's total.
+function makeTaskRow(name, { button = false, dimmed = false } = {}) {
+  const running = button && state.running && state.running.task === name;
   const li = document.createElement("li");
-  li.className = "task-row" + (isToday ? "" : " task-row-other") + (running ? " task-row-running" : "");
+  li.className = "task-row" + (dimmed ? " task-row-other" : "") + (running ? " task-row-running" : "");
   li.style.setProperty("--task-color", taskColor(name));
   li.dataset.task = name;
 
@@ -344,24 +401,26 @@ function makeTaskRow(name, isToday) {
 
   const timeEl = document.createElement("span");
   timeEl.className = "task-time";
+  li.append(nameEl, timeEl);
 
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "row-button";
-  button.dataset.task = name;
-  button.textContent = running ? "■" : "▶";
-  button.setAttribute("aria-label", (running ? "Stop " : "Start ") + name);
-  button.addEventListener("click", () => {
-    if (state.running && state.running.task === name) {
-      stopTimer();
-    } else {
-      startTimer(name);
-    }
-  });
+  if (button) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "row-button";
+    btn.dataset.task = name;
+    btn.textContent = running ? "■" : "▶";
+    btn.setAttribute("aria-label", (running ? "Stop " : "Start ") + name);
+    btn.addEventListener("click", () => {
+      if (state.running && state.running.task === name) {
+        stopTimer();
+      } else {
+        startTimer(name);
+      }
+    });
+    li.append(btn);
+  }
 
-  li.append(nameEl, timeEl, button);
-
-  if (isToday) {
+  if (!dimmed) {
     const bar = document.createElement("div");
     bar.className = "share-bar";
     const fill = document.createElement("div");
@@ -372,15 +431,31 @@ function makeTaskRow(name, isToday) {
   return li;
 }
 
-function renderTaskRows(totals, order) {
+// Fills in row times and share bars from a Map of task -> minutes.
+function updateRowNumbers(list, totals) {
+  const total = sumMinutes(totals);
+  for (const li of list.children) {
+    const minutes = totals.get(li.dataset.task) || 0;
+    li.querySelector(".task-time").textContent = formatMinutes(minutes);
+    const fill = li.querySelector(".share-fill");
+    if (fill) fill.style.width = (total > 0 ? (minutes / total) * 100 : 0) + "%";
+  }
+}
+
+// Task names, most minutes first (ties alphabetical).
+function byMostTime(totals) {
+  return [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || a.localeCompare(b));
+}
+
+function renderTaskRows(order) {
   // Rebuilding replaces the buttons, so put keyboard focus back where it was.
   const focusedTask = document.activeElement && document.activeElement.classList.contains("row-button")
     ? document.activeElement.dataset.task
     : null;
 
   taskRows.replaceChildren(
-    ...order.today.map((name) => makeTaskRow(name, true)),
-    ...order.others.map((name) => makeTaskRow(name, false))
+    ...order.today.map((name) => makeTaskRow(name, { button: true })),
+    ...order.others.map((name) => makeTaskRow(name, { button: true, dimmed: true }))
   );
   todayEmpty.hidden = order.today.length > 0;
 
@@ -390,10 +465,10 @@ function renderTaskRows(totals, order) {
   }
 }
 
-function renderEntries(day) {
+// The entry list for a day (Today's or History's). Returns how many entries it shows.
+function renderEntries(list, day) {
   const entries = dayEntries(day);
-  entriesEmpty.hidden = entries.length > 0;
-  entryList.replaceChildren(
+  list.replaceChildren(
     ...entries.map((e) => {
       const startMs = Date.parse(e.start);
       const endMs = Date.parse(e.end);
@@ -417,7 +492,7 @@ function renderEntries(day) {
 
       const duration = document.createElement("span");
       duration.className = "entry-duration";
-      duration.textContent = formatDuration(msOnDay(startMs, endMs, day));
+      duration.textContent = formatMinutes(minutesOnDay(startMs, endMs, day));
 
       const del = document.createElement("button");
       del.type = "button";
@@ -430,22 +505,115 @@ function renderEntries(day) {
       return li;
     })
   );
+  return entries.length;
 }
 
-// Numbers that change every second: the clock, the header total, row times and bars.
-// Only text and widths change here, so focus and screen readers aren't disturbed.
+// ---------- History ----------
+
+// The day picked in History, as "2026-10-18". Starts on yesterday.
+let historyKey = "";
+
+function historyDay() {
+  return dayFromKey(historyKey) || dayRange(Date.now());
+}
+
+function showHistoryDay(key) {
+  historyKey = key;
+  historyDateInput.value = key;
+  renderHistory();
+}
+
+// History rows have no buttons, so they can be rebuilt every second without
+// disturbing focus. Entries (which have delete buttons) are only rebuilt by renderHistory.
+function renderHistoryRows() {
+  const totals = dayTotals(historyDay());
+  historyRows.replaceChildren(...byMostTime(totals).map((name) => makeTaskRow(name)));
+  updateRowNumbers(historyRows, totals);
+  historyTotalText.textContent = formatMinutes(sumMinutes(totals));
+  return totals.size;
+}
+
+function renderHistory() {
+  historyDateInput.max = dateKey(Date.now());
+  const taskCount = renderHistoryRows();
+  const entryCount = renderEntries(historyEntries, historyDay());
+  historyEmpty.hidden = taskCount > 0;
+  historyEntriesBlock.hidden = entryCount === 0;
+}
+
+// ---------- Last 7 days ----------
+
+function weekData() {
+  const days = lastSevenDays().map((day) => ({ day, totals: dayTotals(day) }));
+  const byTask = new Map();
+  for (const { totals } of days) {
+    for (const [task, minutes] of totals) byTask.set(task, (byTask.get(task) || 0) + minutes);
+  }
+  return { days, byTask };
+}
+
+// Day buttons are rebuilt only here (not every second), so focus isn't lost.
+function renderWeekDays(data) {
+  const todayStart = dayRange(Date.now()).start;
+  weekDays.replaceChildren(
+    ...data.days.slice().reverse().map(({ day }) => {
+      const li = document.createElement("li");
+      li.dataset.dayStart = day.start;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "week-day";
+      const label = document.createElement("span");
+      label.className = "week-day-label";
+      label.textContent = day.start === todayStart
+        ? "Today"
+        : new Date(day.start).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+      const time = document.createElement("span");
+      time.className = "week-day-time";
+      button.append(label, time);
+      button.addEventListener("click", () => {
+        showHistoryDay(dateKey(day.start));
+        historyDateInput.focus();
+        historyDateInput.scrollIntoView({ block: "center" });
+      });
+
+      const bar = document.createElement("div");
+      bar.className = "share-bar";
+      const fill = document.createElement("div");
+      fill.className = "share-fill week-fill";
+      bar.append(fill);
+
+      li.append(button, bar);
+      return li;
+    })
+  );
+}
+
+// Numbers that change while a timer runs. Day bars are relative to the busiest day.
+function updateWeekNumbers(data) {
+  const dayMinutes = new Map(data.days.map(({ day, totals }) => [String(day.start), sumMinutes(totals)]));
+  const busiest = Math.max(0, ...dayMinutes.values());
+  for (const li of weekDays.children) {
+    const minutes = dayMinutes.get(li.dataset.dayStart) || 0;
+    li.querySelector(".week-day-time").textContent = formatMinutes(minutes);
+    li.querySelector(".share-fill").style.width = (busiest > 0 ? (minutes / busiest) * 100 : 0) + "%";
+  }
+  weekTotalText.textContent = formatMinutes(sumMinutes(data.byTask));
+  weekTasks.replaceChildren(...byMostTime(data.byTask).map((name) => makeTaskRow(name)));
+  updateRowNumbers(weekTasks, data.byTask);
+  weekEmpty.hidden = data.byTask.size > 0;
+}
+
+// ---------- Render ----------
+
+// Numbers that change every second: the clock, totals, row times and bars.
+// Rows with buttons only get new text and widths here, so focus isn't disturbed.
 function renderLive(totals) {
   clock.textContent = formatClock(elapsedMs());
-  let grandTotal = 0;
-  for (const ms of totals.values()) grandTotal += ms;
-  todayTotalText.textContent = formatDuration(grandTotal);
-
-  for (const li of taskRows.children) {
-    const ms = totals.get(li.dataset.task) || 0;
-    li.querySelector(".task-time").textContent = formatDuration(ms);
-    const fill = li.querySelector(".share-fill");
-    if (fill) fill.style.width = (grandTotal > 0 ? (ms / grandTotal) * 100 : 0) + "%";
-  }
+  todayTotalText.textContent = formatMinutes(sumMinutes(totals));
+  updateRowNumbers(taskRows, totals);
+  if (historyKey === dateKey(Date.now())) renderHistoryRows();
+  updateWeekNumbers(weekData());
 }
 
 function render() {
@@ -461,8 +629,10 @@ function render() {
   const order = todayRowOrder(totals);
 
   renderSuggestions();
-  renderTaskRows(totals, order);
-  renderEntries(day);
+  renderTaskRows(order);
+  entriesEmpty.hidden = renderEntries(entryList, day) > 0;
+  renderHistory();
+  renderWeekDays(weekData());
   renderLive(totals);
 
   renderedOrder = JSON.stringify(order);
@@ -507,6 +677,16 @@ stopButton.addEventListener("click", () => {
 themeButton.addEventListener("click", cycleTheme);
 undoButton.addEventListener("click", undoDelete);
 
+historyDateInput.addEventListener("change", () => {
+  const key = historyDateInput.value;
+  const today = dateKey(Date.now());
+  if (!dayFromKey(key)) {
+    historyDateInput.value = historyKey; // cleared or not a date: keep the last good day
+  } else {
+    showHistoryDay(key > today ? today : key);
+  }
+});
+
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) tick();
 });
@@ -527,4 +707,7 @@ window.addEventListener("storage", (event) => {
 
 applyTheme(currentTheme);
 if (state.running) taskInput.value = state.running.task;
+const startNow = new Date();
+historyKey = dateKey(new Date(startNow.getFullYear(), startNow.getMonth(), startNow.getDate() - 1).getTime());
+historyDateInput.value = historyKey;
 render();

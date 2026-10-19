@@ -39,6 +39,9 @@ Artifact 2 ("something you will use").
 - An entry that crosses midnight counts toward each day for the part that falls on it.
   Do this split in one shared helper used by Today, History, the 7-day summary and
   the CSV export, so their numbers always agree.
+- Totals are built from whole minutes: each entry's part of a day is rounded to the
+  nearest minute, and every total is a sum of those. So rows add up to the day total
+  and days add up to the week total exactly. The live clock still shows seconds.
 - Times are shown in my local time zone.
 
 ## Features (version 1)
@@ -51,10 +54,17 @@ Artifact 2 ("something you will use").
    with delete. Deleting happens right away with an Undo button for about 6 seconds
    (no confirm question). Today's grand total is shown in the page header.
    Totals include the running timer live. Today switches to the new day at midnight by itself.
-3. History: pick a past day to see its totals, plus a 7-day summary.
+3. History: pick a day (default yesterday, up to today) to see its task rows and entries
+   in the same layout as Today, but with no ▶ buttons; delete with Undo works there too.
+   "Last 7 days" (today and the 6 days before): total per day with a bar relative to the
+   busiest day (clicking a day opens it in History), total per task, and a week total.
 4. Manual entry (task, date, start and end time) for time I forgot to track;
    reject an end time before the start. "Export CSV" downloads all entries with
    columns `task, date, start, end, minutes`, quoting fields that contain commas.
+   "Copy summary" copies one line per task for a chosen day to the clipboard, using a
+   format with `{date}`, `{task}`, `{duration}`, `{minutes}` placeholders. Presets:
+   plain list (default), YouTrack `work` command (`work {date} 1h30m {task}`),
+   spreadsheet (tab-separated), and custom. Nothing is sent anywhere; the user pastes it.
 
 ## Style
 
