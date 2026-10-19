@@ -22,8 +22,12 @@ gaming, anything. Built for TCSS 490, Artifact 2 ("something you will use").
 
 ## Privacy
 
-Everything is saved in your own browser (`localStorage`). Nothing is ever sent anywhere.
+Everything is saved in your own browser (`localStorage`). Your times are never sent anywhere.
 That also means each browser keeps its own data: use **History → Backup** to move it.
+
+The one outside request: the **Launcher** theme (the default for new visitors) loads its
+font, Sora, from Google Fonts, so Google sees that font request. Pick any other theme in
+Settings and nothing is loaded from other sites.
 
 ## How it's built
 

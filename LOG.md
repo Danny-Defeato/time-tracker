@@ -332,3 +332,533 @@ Looking at the screenshots found one problem the checks missed: at phone width, 
 - fill in the portfolio card and write the reflection
 
 **Note:** the times saved while opening `index.html` as a file live in a different browser storage area than the live site. The live site starts empty, and Download a backup / Restore from a backup moves the data over.
+
+## 2026-10-18: Settings window, close button and folding sections
+
+**Asked for:** a × close button in a header with the "Settings" title that stays visible while the window scrolls (aria-label "Close settings", visible focus); Esc and clicking outside also close it; each section (Look, Daily goals, Rename or merge, Reminder, Keyboard shortcuts) can be folded, with only Look open at first; keep Done at the bottom.
+
+**Changed**
+- `index.html`: the title and a new × button sit in a `settings-header`. Each section is now a `<details>` with its name in the `<summary>`, so folding works with the mouse, Enter and Space without extra code.
+- `styles.css`: the header is sticky at the top of the window, with the surface colour behind it so content scrolls underneath. The × is a 44px button and uses the same yellow focus ring as other buttons. Section names show ▸ when folded and ▾ when open, and screen readers skip the arrows.
+- `app.js`: the × closes the window. Clicking the dark area outside closes it too, but only if the press and the release both happen outside, so dragging a text selection out of a box doesn't close it by accident. Esc was already built into `<dialog>`. Each time Settings opens, only Look is unfolded.
+
+**Decisions**
+- Sections reset to "only Look open" every time the window opens, not just the first time, so it always opens the same way.
+- I used the browser's built-in `<details>` rather than custom buttons: it's keyboard-friendly by default and needs less code.
+- Checked in headless Chrome: opens with only Look unfolded, the header stays at the top after scrolling, × and outside clicks close it, clicks inside don't, the aria-label is right, and nothing sticks out sideways.
+
+## 2026-10-18: Week chart
+
+**Asked for:** a column chart of the last 7 days above "By day" in the Week tab: one column per day, its height showing the day's total, stacked coloured segments per task (each task's existing colour). Hovering or tapping a column shows the day's total and each task's time. A small legend. Plain HTML/CSS, no library. Use the shared midnight-split helper so the numbers match the lists. Screen readers get a text label for each column.
+
+**Changed**
+- `index.html`: a new "Each day by task" block in the Week tab with a one-line hint, the chart (a list of 7 columns) and the legend.
+- `app.js`:
+  - `renderWeekChart` builds the columns and legend when the page renders. `updateWeekChart` refreshes heights, segments, pop-ups and labels every second while a timer runs. Both use `weekData()`, which uses `dayTotals()` / `secondsOnDay()`, the same split as By day, By task and the week total. A midnight-crossing entry is split between its two columns.
+  - Each column is a button. Its accessible name is a hidden sentence like "Today: 2h 55m 00s. Studying 1h 15m 00s, Coding 1h 40m 00s". The bars, the pop-up and the short day name are hidden from screen readers so nothing is read twice.
+  - Tapping a column opens its pop-up, and tapping another column, tapping elsewhere or pressing Esc closes it. Esc also hides a hover or keyboard-focus pop-up.
+  - A small helper (`placeChartTip`) centres the pop-up over its column but keeps it inside the chart, so it never sticks out on a phone.
+  - The "Today"/date label logic is now one helper (`weekDayLabel`) shared with By day.
+- `styles.css`: the chart, segments, pop-up and legend, all using the existing theme colours and task colours. Hover effects are only used on devices with a mouse, so a tap on a phone doesn't leave a pop-up stuck open.
+
+**Decisions**
+- Heights are relative to the busiest day, like the By day bars. In every column the task with the most time this week is at the bottom, so colours stack in the same order. The pop-up lists tasks biggest first, like the task rows.
+- Under the columns, today shows its weekday in bold instead of "Today", because "Today" didn't fit at phone width. The pop-up and the screen-reader text still say "Today".
+- The chart is hidden when nothing was tracked in the last 7 days (the existing "Nothing tracked" message shows instead).
+- Checked in headless Chrome with test data (a midnight-crossing entry plus a running timer):
+  - each column's task times add up to its total
+  - each column matches By day, and the columns add up to the week total
+  - tapping opens a pop-up, another tap switches to that column, a tap outside closes it
+  - at 320px wide no pop-up goes off screen and the page doesn't scroll sideways
+
+## 2026-10-18: No shared colours within the week
+
+**Asked for:** the suggestion from the week chart: tasks in the last 7 days should never share a colour.
+
+**Changed** (`app.js`)
+- `hashColor(name)` is the old colour-from-the-name rule.
+- New `assignTaskColors()` runs on each full render. It takes the tasks with time in the last 7 days, oldest first (by the first time each was used). Each one keeps its own colour if it's free, otherwise it takes the next free colour in the palette.
+- `taskColor(name)` uses that assignment, and falls back to the name colour for tasks outside the week.
+
+**Decisions**
+- Oldest tasks go first, so long-used tasks keep their colour and a newer task is the one that moves.
+- Trade-off: CLAUDE.md says a name always has the same colour. Now a task can change colour when the set of tasks in the last 7 days changes (for example, "Cooking" goes back to its own colour once "Coding" drops out of the week). Within any one view the colours are still consistent.
+- With more than 8 tasks in a week, sharing can't be avoided, and the extra tasks use their name colour.
+
+## 2026-10-18: Month calendar in History
+
+**Asked for:** a month calendar above the date picker in History. One square per day, shaded by hours tracked (4 shades). Previous/next month buttons. Clicking a day opens it. Screen-reader labels like "October 14: 2h 10m". Use the shared midnight-split helper.
+
+**Changed**
+- `index.html`: the calendar block with ‹ › buttons, the month title, weekday letters, the day grid and a small key.
+- `app.js`:
+  - `renderCalendar()` rebuilds the squares only when the month (or today) changes, so focus stays put. `updateCalendar()` sets each square's shade and label from `dayTotals()`, the same helper as everything else. It also runs every second with the clock, so today's square follows a running timer.
+  - Shades: none, under 1h, 1–3h, 3–5h, 5h+ (`calendarLevel`).
+  - Clicking a square calls `showHistoryDay`. Picking a day in the date picker or from the Week tab moves the calendar to that day's month.
+  - Future days are disabled, and › turns off on the current month.
+- `styles.css`: the grid and the shades, mixed from the accent colour so they follow every theme and accent. Today is underlined, and the day shown below has a ring.
+
+**Decisions**
+- Labels round to the nearest minute ("2h 10m", "under 1m" for a few seconds). The day shown below adds ", shown below" to its label. The month title is announced when it changes.
+- Weeks start on Sunday.
+- I added a small key ("none · under 1h · 1–3h · 3–5h · 5h+"), because the shades mean nothing without one. It's hidden from screen readers since each square's label already says the time.
+- Contrast: my first shades left day numbers at 3.0:1 in Light + Green. Shades 1–3 are now light tints with normal text and shade 4 is the full accent with button text. A check of all 5 themes × 6 accents gives at least 5.0:1.
+
+## 2026-10-18: Notes on entries
+
+**Asked for:** an optional short note (up to 120 characters) on any entry. An "Add note" / "Edit note" button opens a small text box, Enter saves and Esc cancels. Show the note under the entry in Today and History, include it in the Excel export and the copied text, and keep it in backups. Old entries must keep working.
+
+**Changed**
+- Data: entries can have an optional `"note"`. Entries without one are left exactly as they were. When saved data or a backup is cleaned on load, a note is trimmed, cut to 120 characters, and dropped if it's blank or not text.
+- `app.js`:
+  - Each entry row has a note line: the note in italics plus "Add note"/"Edit note". Pressing it swaps in a text box with Save / Cancel buttons (phones have no Esc key) and the hint "Enter saves, Esc cancels".
+  - Saving an empty box removes the note. Focus returns to the note button afterwards.
+  - What's typed is kept in `noteEdit`, so a re-render (the timer starting, another tab saving) doesn't wipe the box or move the cursor.
+  - Copy this day: a task's notes from that day go at the end of its line, oldest first, without repeats: `Coding: 4h 00m 00s — fixed login; wrote tests`. This works in YouTrack format too: `work 2026-10-16 4h Coding — fixed login; wrote tests`.
+  - Excel: a new "Note" column (E).
+  - Backups: notes are saved as part of each entry, and Restore keeps them.
+  - Editing an entry (or Undo) keeps its note.
+- `styles.css`: the note line, box and hint.
+
+**Decisions**
+- The copied text has one line per task (not per entry), so notes are joined onto the task's line.
+- Restore still treats an entry as "already here" by task + start + end. A backup copy of an entry that's already here doesn't overwrite its note.
+
+## 2026-10-18: Pop-out timer
+
+**Asked for:** a "Pop out" button next to the timer that opens a small always-on-top window (Document Picture-in-Picture, Chrome and Edge) with the task name, the live time and a Stop button that really stops the timer. Hide it where unsupported. Closing the small window just closes it.
+
+**Changed**
+- `index.html`: a "Pop out" button next to the Timer heading, hidden until the browser says it supports this.
+- `app.js`:
+  - `popOut()` opens the window, links `styles.css` into it, and copies the current theme and accent. It builds the task name, clock and a Stop button that calls the page's own `stopTimer()`, so stopping there saves an entry exactly like the main Stop.
+  - `updatePip()` runs with every clock update, so both clocks match.
+  - When no timer is running, the window shows "Not tracking" and Stop is greyed out.
+  - Closing the window (`pagehide`) only forgets it, and the timer isn't touched. Pressing Pop out while it's open focuses the existing window.
+- `styles.css`: the small window's layout.
+
+**Decisions**
+- Opening the window needs a real click (a browser rule), so it can't reopen by itself after a reload.
+- Checked in headless Chrome with a stand-in window (headless can't show the real one): it shows the task and live time, its Stop stops and saves the timer, and closing it leaves the timer alone. The real window needs a manual check in Chrome or Edge.
+
+**Tests for all four** (headless Chrome, test data on a scratch copy): 29 checks passed. They covered:
+- distinct week colours
+- calendar shades matching `dayTotals`, labels, clicking a day, month arrows, future days
+- note load/trim/cap, Enter/Esc/empty, typing surviving a re-render, notes in copy/YouTrack/Excel/backup, Edit keeping notes
+- Pop out show/stop/close
+- calendar contrast in every theme × accent
+
+**Found, not changed:** at 320px wide, entry rows were already squeezed before today (task names wrap a letter or two per line). It's still that way; I'd suggest a fix separately.
+
+## 2026-10-18: CLAUDE.md update, phone layout fixes, no Done button, mobile bug sweep
+
+**Asked for:** update CLAUDE.md; fix the squeezed entry rows at phone width; remove Settings' Done button (the × does the job); check how the app runs on mobile and fix bugs found.
+
+**Changed**
+- **CLAUDE.md:** describes today's features:
+  - the optional `note` in the data model
+  - the Week chart and History calendar (and that they use the shared split helper)
+  - notes in copy, Excel and backups
+  - Pop out
+  - the Settings window (× in a sticky header, Esc/outside click, folding sections, no Done)
+  - the new task-colour rule
+  - a phone layout rule (≤ 26rem, must work at 320px, hover effects only on devices with a mouse)
+- **Entry rows on phones** (`styles.css`): at 320px the task name only had 26px, because the dot, duration, Edit and × columns took the rest. Up to 26rem (416px) wide, the duration now goes on its own line under the time range.
+- **Task rows on phones** (found in the sweep, worse than the entry rows): a long name with a goal ("✓ 1h 30m 00s / 1h30m") squeezed the name to 10px, one letter per line. On phones the time/goal now sits under the name, with ▶/■ beside both lines.
+- **Done button removed** from Settings (markup and handler). The × now gets focus when the window opens, instead of the Theme box: Chrome shows a select's focus ring even after a tap, which looked odd on phones.
+- **Bug: stale note box.** Deleting an entry while its note box was open, then pressing Undo, brought the box back without focus. A note box whose entry is gone is now dropped.
+- **"Edit note" link** was indented by the general link padding. Fixed.
+- **Calendar shades** spaced a little further apart (18% / 31% / 43% accent tints): in the dark theme, "none" vs "under 1h" and "1–3h" vs "3–5h" were hard to tell apart. They still pass 4.5:1 in every theme × accent (lowest 4.73).
+
+**How I checked mobile:** a script drove headless Chrome through its DevTools protocol with real phone emulation: 320, 375 and 414px wide, touch input, no hover, 2× pixel density. On every tab and window (Today, note editing, History calendar and lists, Share, Week chart with taps, Settings scrolled open, Add time, Edit) it checked for:
+- the page scrolling sideways
+- anything off screen
+- squeezed text
+- tap targets under 24px
+- JS errors
+
+It also tried these by touch:
+- tap outside Settings to close it, and Esc
+- tap Add note, type with the on-screen keyboard, tap Save
+- delete with a note box open, then Undo
+- open and close chart pop-ups
+
+After the fixes, every check passes at all three widths with no JS errors, and the 29 feature checks from earlier still pass.
+
+**Not changed (judgement calls):**
+- The blank gaps under "Use YouTrack format" and in Add time are space kept for messages, so nothing jumps when one appears.
+- The goal shows as "/ 1h30m" (YouTrack style), as CLAUDE.md describes.
+- Add time focuses the task box when it opens, so phones show the keyboard straight away. That's what you'd type next anyway.
+
+## 2026-10-18: Launcher theme and smooth motion
+
+**Asked for:** a "Launcher" theme matching my portfolio site's game-launcher look:
+- navy #10141f with panels #1a2030 / #232b40, the Sora font (Google Fonts, system fallback), 14px corners
+- an orange→purple→blue gradient (#ff7a59, #c64bff, #3f6bff) on the title, the Start button, the active tab underline and the week bars
+- a soft purple glow on the timer card while it runs
+- in the theme list and the default for new visitors, with the accent swatches swapped for gradients (Sunset, Ocean, Lime, Ember)
+
+Plus smooth motion in every theme: sliding tab underline, panels fading in, animated bars, totals counting up, entries sliding in and out, buttons pressing down, dialogs and the undo toast popping in. All under 0.5s, all off with prefers-reduced-motion, looks only.
+
+**Changed**
+- `styles.css`:
+  - New `:root[data-theme="launcher"]` colours, plus Ocean / Lime / Ember overrides via `data-gradient`.
+  - A new `--raised` colour (inputs, small buttons, inactive tabs). It equals the page background in every other theme, so they look the same as before.
+  - Launcher extras: Sora, 14px corners, gradient title / Start / tab underline / By day bars, and the glow (`.timer-card.is-running`). In Windows high-contrast mode the title falls back to normal text, since that mode removes backgrounds.
+  - A Motion section with the animations. One `prefers-reduced-motion` rule turns every animation and transition off.
+- `index.html`:
+  - The head script picks Launcher for new visitors, applies the saved gradient, and adds the Sora `<link>` only when Launcher is the theme.
+  - Launcher is first in the theme list, and there's a new "Accent gradient" group of 4 swatches.
+  - Added the tab underline element and a `timer-card` class.
+- `app.js`:
+  - `timeTracker.gradient` setting. While Launcher is on, Settings shows the gradients instead of the accent colours.
+  - `defaultTheme()`: Launcher if there are no saved times, otherwise Auto. The first choice is saved straight away, so it can't flip later.
+  - `loadLauncherFont()`, also used for the pop-out window, which now copies the gradient too.
+  - `placeTabIndicator()`.
+  - `showTotal()` counts the 3 headline totals up in 0.4s and always ends on the exact `formatSeconds` value. Small live-timer steps, the first fill and a hidden page set it directly.
+  - Entries new since the last render of the same day get `is-entering`.
+  - Delete plays a 0.22s slide-out (`animateOut`), then deletes as before.
+  - The timer card gets `is-running`.
+- `README.md` privacy section, and CLAUDE.md (stack note, settings keys, Style section): updated for the font request, the theme list and the motion rules.
+
+**Decisions**
+- **Privacy:** Sora comes from Google Fonts, so the browser contacts Google. Your times are never sent, but "nothing is ever sent anywhere" was no longer true, so the README and CLAUDE.md now say so. The font is only requested while Launcher is the theme. With any other theme, the page loads nothing from other sites (checked).
+- **"New visitors"** means no saved times. People who already use the app and never picked a theme stay on Auto instead of suddenly changing.
+- **Gradients:** Sunset uses your exact colours. Ocean (#5eead4 → #38bdf8 → #818cf8), Lime (#d9f99d → #84cc16 → #22c55e) and Ember (#fde047 → #fb923c → #f87171) are light enough for dark button text. Each also has a solid accent for links, outlines and the calendar. Lime's first accent (#a3e635) left calendar numbers at 4.46:1, so it's #93d22c (5.03:1).
+- **The glow** uses the gradient's middle colour: purple for Sunset as asked, and teal-blue, green or orange for the others.
+- **Contrast** (checked for all 4 gradients):
+  - text 11.9:1, muted 6.25:1
+  - button text on the Start gradient where the word sits at least 4.74:1 (Sunset)
+  - task colours 5.97:1, calendar at least 5.03:1
+  - The gradient title is large text and meets 3:1 (Sunset's blue end is 4.14:1), not the 7:1 house rule. That's noted in CLAUDE.md as an exception.
+- **The tab underline** shows in every theme, in the accent colour (the gradient in Launcher).
+- **Only looks:** the slide-out delays the actual delete by 0.22s (Undo appears right after). With reduced motion it's instant. Totals always end on the real number.
+
+**Tests:** a script drove headless Chrome through its DevTools protocol; all checks passed. It covered:
+- the new-visitor default, and existing users keeping Auto
+- the font request only in Launcher, and no other-site requests otherwise
+- all 4 gradients applying and being saved
+- contrast for all 4 gradients
+- the underline sliding and landing under the tab, the panel fade, the total counting up and landing exactly
+- entry slide-in, slide-out then delete, Undo, toast and dialog pop-in, button press rule, glow on and off
+- longest animation 0.4s
+- reduced motion: CSS motion off, totals and delete instant
+- no JS errors
+
+The mobile sweep (320/375/414px, touch) in Launcher and the 29 feature checks from before also pass.
+
+## 2026-10-18: Pixel, the companion robot
+
+**Asked for:** a small robot named Pixel in the corner of the timer card, HTML/CSS only, with three moods:
+- asleep with a floating "z" when no timer runs
+- bobbing and typing while a timer runs
+- hopping happily for a few seconds when I meet a daily goal
+
+Clicking him shows a random line in a speech bubble. Plus a "Show Pixel" switch in Settings. He must not cover any buttons on a phone, and his animations stop with prefers-reduced-motion. (I said I might paste my portfolio's Pixel CSS; I haven't yet, so this is Claude's own drawing in the same style.)
+
+**Changed**
+- `index.html`: the status line and Pixel now share a row at the bottom of the timer card (`timer-footer`). Pixel is a button made of spans (antenna, screen head with eyes and mouth, body, arms, a tiny keyboard, a "z"), with the speech bubble next to him. There's a "Show Pixel" switch (a checkbox with `role="switch"`) at the end of Settings → Look.
+- `styles.css`, new Pixel section:
+  - The drawing, and the three moods via `data-mood`: asleep (eyes shut, "z" drifting up), working (bob plus alternating typing arms, keyboard shown), happy (^ ^ eyes, smile, arms up, 6 hops ≈ 3s).
+  - The speech bubble.
+  - The switch styling.
+  - In Launcher his eyes and antenna use the gradient colour.
+  - In Windows high-contrast mode he keeps his own colours, since that mode strips backgrounds and would leave him half invisible.
+- `app.js`:
+  - `timeTracker.pixel` setting (on by default).
+  - `updatePixel()` runs with each clock update and only touches the page when his mood changes. His label says the mood ("Pixel, working. Press for a message.").
+  - `applyGoals` now notices a goal that has just become met and calls `pixelCelebrate()`. Goals already met when the page opens don't count, and neither does a rename.
+  - `pixelSay()` picks a random line (not the same one twice in a row) that fits the moment:
+    - running: "Still on Coding? Nice.", time so far, time left to the goal
+    - asleep: "Today so far: …", a few sleepy lines
+    - happy: "Goal met! Nice work."
+  - The line shows for 4 seconds in a `role="status"` bubble, so screen readers read it.
+- CLAUDE.md: the new setting key, Pixel as feature 7, and his long loops as the exception to the half-second motion rule.
+
+**Decisions**
+- **Placement:** Pixel is in the normal page flow, not floating, so he can't sit on a button at any size. The "Still working?" banner appears below his row.
+- **The bubble** first sat above him, over the clock digits. It's now to his left, in his own row, and taps pass through it.
+- **Loops:** his loops repeat for as long as the mood lasts, so they're longer than the 0.5s UI motion. Moving content that keeps going needs a way to hide it: that's the Show Pixel switch, and reduced motion stops them. With reduced motion the "z" still shows, standing still.
+- The outline when hovering over him only shows on devices with a mouse, so a tap on a phone doesn't leave it stuck.
+
+**Tests** (headless Chrome via its DevTools protocol, phone emulation at 320/375/414px with touch, plus desktop): 49 checks passed on two runs, with no JS errors. They covered:
+- each mood and its animation, labels, and that tapping shows a line that disappears by itself
+- Pixel and the bubble covering no button, input or select, with the bubble open and with the "Still working?" banner, plus no sideways scrolling
+- the hop when a goal is met and the return to working after ~3s, asleep after Stop, and no hop for goals already met at load
+- the switch being on by default, hiding him, saving, and staying off after reload
+- reduced motion stopping every Pixel animation
+
+I also looked at him in all 6 themes.
+
+## 2026-10-18: Weekly Banner
+
+**Asked for:** a "Weekly Banner" in the Week tab with four slides to step through: total time this week (and the change from last week), top task, longest single session, busiest day. Use the shared midnight-split helper so the numbers match the Week tab. Arrow keys move between slides.
+
+**Changed**
+- `index.html`: the banner sits under the Week total. It has four slides in a track, ‹ › buttons, four dot buttons, and a hidden live line for screen readers. It's marked up as a carousel: the region and each slide say "carousel" / "slide" and "2 of 4: Top task".
+- `styles.css`: a card with a stripe along the top (the accent, or the gradient in Launcher). The slides move with a 0.35s slide, which reduced motion turns off. The dots are 32px tap targets.
+- `app.js`:
+  - `updateBanner()` runs with the Week numbers, so it stays live while a timer runs. Everything comes from `weekData()` / `dayTotals()` / `secondsOnDay()`:
+    - **Total:** the same number as the Week total, plus "▲ 2h 30m 00s more than the 7 days before" (or less, the same, or "Nothing tracked the 7 days before"). The 7 days before come from `previousSevenDays()`.
+    - **Top task:** the first By task row, with its share of the week.
+    - **Longest single session:** the entry (or the running timer) with the most time inside the 7 days. An entry that started before the window only counts its part inside it.
+    - **Busiest day:** matches By day (the most recent day if two tie).
+  - `showSlide()` moves the track, marks the other slides `aria-hidden`, sets `aria-current` on the dot, and announces the slide.
+  - Arrow Left/Right wrap around; Home/End go to the first/last. They work while focus is anywhere in the banner.
+
+**Decisions**
+- **"This week"** is the Week tab's Last 7 days, and "last week" is the 7 days before that, so slide 1 always equals the Week total.
+- **No auto-advance:** slides only move when you ask.
+- **Screen readers:** the slide text updates every second while a timer runs, so it isn't a live region (that would announce every tick). A separate hidden line announces a slide only when you change it.
+- **Hidden when empty:** like the chart, the banner is hidden when nothing was tracked in the last 7 days.
+- **Bug found and fixed while testing:** with only a just-started timer this week, the longest session is 0 seconds for the first half-second. The banner code then crashed, which stopped Start from finishing its screen update. It now shows "0h 00m 00s · Nothing yet." This case is part of the banner test now.
+
+## 2026-10-18: Plan my day
+
+**Asked for:** a "Plan my day" option in Today to set a planned amount for any task for today only (separate from daily goals, which repeat). Today's rows show the plan as a dashed outline behind the real bar, with "on track", "40m to go" or "25m over". Gaming-style tasks may go over, with over-plan time in red. Plans are saved per date in their own localStorage key and included in backups.
+
+**Changed**
+- `index.html`: a "Plan my day" button at the top of Today, and a "Plan my day" window: the same × header as Settings, a hint explaining plan vs goal, today's plans with Remove, Task + hours/minutes, "Add to today's plan".
+- `styles.css`:
+  - The bar row (`bar-line`: bar plus status text).
+  - On rows with a plan: a taller bar, a dashed outline for the plan, the fill in front, and a red part for time over the plan.
+  - Status colours: "on track" in the accent, "over" in red, "to go" muted.
+- `app.js`:
+  - `timeTracker.plans` = `{ "2026-10-18": { "Coding": 120 } }`, cleaned on load (real dates, non-blank names, 1 minute to 24 hours; corrupt data means no plans).
+  - `todayRowOrder` adds planned tasks that have no time yet after today's tasks, as normal rows with ▶.
+  - `applyPlans()` runs after the bars are filled in. Rows with a plan show progress against it:
+    - the scale is the larger of plan and actual
+    - "on track" within a minute of the plan
+    - "1h 15m to go" (rounded up)
+    - "15m over" (rounded down), in red
+  - Backups now include `plans`. Restore adds plans only for a date + task with no plan here (never overwrites), counts them in the message ("Restored 0 entries and 2 plans"), and Undo removes them. Old backups without plans still work.
+  - Renaming or merging a task moves its plans (a day that already plans the new name keeps that plan), and Undo puts them back.
+  - Another tab changing the plans updates this one.
+  - The Settings "click outside to close" code is now a shared helper (`closeOnBackdrop`) that the plan window uses too.
+
+**Decisions**
+- **Planned rows switch bar meaning:** a planned row's bar shows progress against the plan instead of its share of today. The dashed outline only makes sense on the same scale as the time, and the status text says what the bar means. Rows without a plan are unchanged.
+- **Only Today rows:** History rows and the Week tab don't show plans.
+- **"On track"** means within a minute of the plan. Under it shows time to go; past it shows time over.
+- **Red for every task:** over-plan time is red for all tasks, and going over is never blocked.
+- **Focus after delete:** the button is styled like the header buttons, not a `secondary-button`, so focus after deleting an entry still returns to "+ Add time".
+
+**Tests** (headless Chrome via its DevTools protocol): 51 banner and plan checks passed on two runs, with no JS errors. They covered:
+- every banner number against the Week tab, including an entry crossing into the window
+- arrows, wrap, Home/End, dots, announcements, live updates, the slide animation, reduced motion, hidden when empty, the first-timer case
+- plan refusals, the list, to go / over (red) / on track, a planned row with no time yet, rows without plans unchanged, per-date storage separate from goals, no plans in History, another date's plan not showing
+- focus after delete, backup includes plans, restore adds/doesn't overwrite/skips bad dates/Undo, old backups, rename + Undo, corrupt storage
+- red, outline and "on track" contrast in all 6 themes
+- no layout problems at 320px and 375px (Today, the plan window, each banner slide)
+
+The Pixel checks (49), the Launcher and motion checks (28), the mobile sweep and the 29 feature checks also pass.
+
+## 2026-10-18: Wider layout and today's ring chart
+
+**Asked for:** the app felt too linear. Expand it on wider screens and add a circle chart of today's tasks. Claude made a canvas of options (three layouts, four chart styles), and I picked **layout A (two columns)** with **chart 1 (share of today, total in the middle)**. Asked before building: keep the real task rows next to the chart (not a separate legend), and no extra "Today's plan" card.
+
+**Changed**
+- `index.html`: the timer card is wrapped in `layout-side` and the tabs and panels in `layout-main`, inside a `layout` grid. In Today, a `today-overview` row holds the ring chart (`<figure>` with an SVG whose `<title>` is its text version, and the total in the middle) and the existing empty message and task rows.
+- `styles.css`:
+  - **From 60rem (960px):** `main` widens from 32rem to 75rem. A two-column grid puts the timer column (20–25rem) on the left and the tabs on the right. When the window is at least 44rem tall, the timer column is sticky, so it stays in view while the right column scrolls. Entries become a grid of 17rem+ cards using the phone row layout, since a card is phone-narrow.
+  - **The ring:** 200px (160px on phones), with a hairline gap between segments, and segments animate (0.35s, off with reduced motion). The rows sit beside it when there's room for both (22rem of rows), otherwise below it.
+  - The wide-screen block sits after the entry styles so its card rules win.
+- `app.js`: `updateTodayChart(totals)` runs with each clock update, using the same `dayTotals()` totals as the rows, in the same order (most time first) and colours. It updates the existing segments in place, so they grow smoothly (only re-ordering when the order changes). It keeps the centre total and the screen-reader text current, and hides the ring when nothing has been tracked today.
+- CLAUDE.md: the wide layout and the ring.
+
+**Decisions**
+- **Ring placement:** the task rows stay as the ring's legend: their colour stripes match the segments, and they keep ▶/■, goal ticks and plan bars. The ring goes above the rows in narrower two-column widths (960–~1150px) and on phones, rather than squeezing the rows.
+- **Phones keep the single column**, with a smaller ring above the rows.
+- **Thinner ring:** the first version's centre total ("5h 30m 00s") touched the inside of the 160px phone ring in Sora. The ring is now slightly thinner (stroke 20) and the text slightly smaller. The test checks the text fits the hole at every width.
+- **History and Week** just get the wider column for now; nothing else changed there.
+
+**Tests** (headless Chrome via its DevTools protocol): the new layout test passed all 90 checks at 1280, 1000, 960, 959, 768, 375 and 320px in Launcher and Light, with no JS errors. It covered:
+- two columns from 960px, one column below
+- the ring beside or above the rows
+- entries as cards
+- the timer staying in view after scrolling 700px
+- ring segments matching the rows (count, order, colours), filling exactly one circle, each starting where the last ends
+- the centre total equal to today's total, the text version, live growth while a timer runs
+- the ring hidden with nothing tracked, then appearing on the first timer
+- reduced motion
+- no layout problems on any tab at any width
+- the centre text fitting the hole
+
+All earlier suites still pass: phone sweep, Pixel 49, banner/plans 51, Launcher/motion 28, features 29.
+
+## 2026-10-18: History and Week use the wide layout; clearer task colours
+
+**Asked for:** the two follow-ups from the wide layout. History and Week should use the extra width too, and the blue and sky-blue task colours that looked alike in the ring should be fixed.
+
+**Changed**
+- `index.html`: in History, the calendar and date picker (`history-pick`) and the day's total and rows (`history-day`) are wrapped in a `side-by-side` row. In Week, the banner and the chart share one `side-by-side` row, and By day and By task share another.
+- `styles.css`:
+  - `.side-by-side` is a wrapping flex row where each part wants about 20rem. Parts sit next to each other when there's room (the wide right column) and stack otherwise (phones, and two-column widths under about 1150px).
+  - The 8th task colour (`--task-7`) was a sky blue that looked like the blue (`--task-0`) in every theme:
+    - dark themes (Dark, Midnight, Auto-dark, Launcher): slate #cbd5e1
+    - light themes: stone #57534e
+    - High contrast: #404040
+- CLAUDE.md: the side-by-side sections.
+
+**Decisions**
+- **No breakpoints:** the side-by-side rule is based on available room, not the screen width, so it adapts to the column it's in.
+- **Neutral 8th colour:** a neutral was the only choice unlike all seven hues already used. Checked: every pair of task colours is clearly different (colour distance ΔE ≥ 22 in every theme), and all still have at least 3:1 contrast against the surface.
+
+**Tests:** the layout test (95 checks, new: side by side at 1280px, stacked at 375px, task colour distances and contrast in all 6 themes) and all earlier suites pass, with no JS errors.
+
+## 2026-10-18: Settings revamp and a Tasks tab
+
+**Asked for:** daily goals and rename/merge shouldn't be hidden in Settings; Share and Backup should be in Settings instead of History.
+
+**Changed**
+- `index.html`:
+  - A fourth tab, **Tasks** (Today | History | Week | Tasks), with Daily goals and Rename or merge side by side (stacked on phones). It's the same forms with the same ids, moved out of Settings.
+  - **Settings sections:** Look → Reminder → Keyboard shortcuts → **Share** → **Backup** → **Help** (Help is added in the tour entry below).
+  - Share has its own "Day to copy" date picker.
+  - Backup's Undo now sits next to its message.
+- `app.js`:
+  - `shareDay()` = the Share date picker, which starts as the History day each time Settings opens.
+  - Opening Tasks fills the goal list and the rename options (keeping the selected task).
+  - Shortcut **4** opens Tasks.
+  - Restore no longer uses the Undo popup: an open window makes everything behind it unclickable, so the popup would be out of reach. Its Undo is a button inside Settings, cleared by the next restore.
+  - Another tab changing goals refreshes the goal list.
+- `styles.css`: the select and label styles also apply in the Tasks tab. Removed the unused History share/backup rules.
+- CLAUDE.md updated.
+
+**Decisions**
+- **A Tasks tab** keeps goals and renaming one click away, without crowding Today.
+- **The copy day picker** starts on the History day, so "pick a day in History, then copy it" still works as before.
+
+## 2026-10-18: Pixel's personality (from the portfolio)
+
+**Asked for:** Pixel should behave like the portfolio's Pixel: toss him around, click him, watch him get angry. Show the rage meter only once he's annoyed.
+
+**Changed** (`index.html`, `styles.css`, `app.js`; ported from the portfolio's `main.js` and `styles.css`)
+- **The drawing:** the portfolio's SVG, with happy, mad, dizzy, asleep and normal faces, one shown at a time via `data-mood`. Resting moods are still asleep (no timer) and working (bobbing, now with a typing keyboard).
+- **Poking:**
+  - When he's calm: chat lines that fit the moment (task, time so far, goal left).
+  - When he's asleep: a poke wakes him ("Huh? I'm up!") and doesn't count against you.
+- **Temper (0–100):** pokes +7, throws +14, hard landings +10; it drains 3 every half second after 3 quiet seconds.
+  - Five stages: calm, annoyed, grumpy, angry, furious. Each has its own lines and face.
+  - His shell warms to red (`data-anger`), and he puffs steam when furious.
+  - A **rage meter** above his head shows from "annoyed". His label says the stage ("Pixel, working, annoyed").
+- **Tossing:** drag him (the drag starts after 8px, so a click is still a poke).
+  - Let go and he flies with gravity, bounces off the window edges, says "Ow!" and goes dizzy after a hard landing, then walks home.
+  - While he's away he's above everything.
+  - Letting go over a button doesn't press it.
+  - With reduced motion he can't be tossed.
+- **His eyes follow the mouse** (mouse and trackpad only).
+- **Lines are typed out** letter by letter. Screen readers get the whole line at once from a hidden status.
+- **Hiding him** from Settings mid-toss puts him straight back.
+
+**Decisions**
+- **No idle naps:** the portfolio's Pixel naps when you're idle, but here "asleep" already means "no timer running", so I didn't add a second sleep.
+- **A real timing bug**, found by the test and fixed: after waking him, a timer meant for the excuse line raced his dizzy face (both 1.1s), so he fell straight back asleep. Each wake-up now has its own id.
+
+## 2026-10-18: Pixel's game, Stop the Clock
+
+**Asked for:** when Pixel's rage meter is full he forces you to play a game, a different one from the portfolio's bug squash.
+
+**Changed**
+- A `#clock-game` window: stop a stopwatch on exactly **5.00** seconds.
+  - Within **0.10** on 2 of 3 tries wins; try 3 goes **dark** (the numbers vanish after 2 seconds). It ends early once 2 hits or 2 misses are in.
+  - The time is taken from the button press itself (`event.timeStamp`) and judged to the hundredth shown, so 5.10 counts and 5.11 doesn't.
+  - The ring fills toward 5 seconds (not with reduced motion), and the tries show "✓ 0.04 off" / "✗ 0.32 off".
+  - An angry Pixel in the window gloats ("Ha! Missed by 3.99.") and smiles when you win.
+- **Winning:** "Done" closes it, and his temper goes back to 0 ("Good game. We're cool.").
+- **Losing:** "Try again".
+- **Giving up:** "Give up" or Esc always closes it. He's left grumpy ("Fine. Be that way.") but the game is over.
+
+**Decisions**
+- **One big button** (Start / Stop, Space works), so it's fair on keyboard, mouse and touch, and still works with reduced motion.
+- **Never trapping:** forcing you to play never means you can't get out.
+
+## 2026-10-18: Pixel's tour
+
+**Asked for:** a quick tutorial of what to do, presented by Pixel.
+
+**Changed**
+- A `#tour` window covering the screen. A spotlight (a huge shadow) dims everything except the part being explained, and Pixel's card (with his jetpack) sits beside it, below it or above it, whichever fits, always on screen.
+- **Six steps:**
+  1. start a timer
+  2. Today (ring and rows)
+  3. Plan my day
+  4. entries / Add time
+  5. History, Week and Tasks
+  6. Settings, plus "poke me… just not too much"
+- **Controls:** Back, Next (Done on the last step), Skip tour, and Esc. Focus starts on Next.
+- **Shown once** to everyone (`timeTracker.tour` = "done" afterwards). Settings → **Help → Show the tour again** replays it.
+- When it ends, Pixel says "Have fun! I'll be right here." and focus goes to the task box.
+
+**Decisions**
+- **It's a modal window**, so the page behind can't be used by accident while it's open.
+- **Short phone screens:** when the card can't fit without covering the part being explained, the page scrolls that part near the top and the card goes underneath. The test found this at 320px on step 5.
+
+## 2026-10-18: Glass look (Launcher) and the portfolio's gradients
+
+**Asked for:** the portfolio's glassy look in Time Tracker (Launcher only), and the gradients matched to the portfolio exactly.
+
+**Changed** (`styles.css`, plus a few lines in `app.js` for the mouse light)
+- **Gradients:** Ocean, Lime and Ember now use the portfolio's exact stops (in the swatches too).
+- **Glass, Launcher only:**
+  - Panels and windows are see-through (62%) and frosted (blur 16px).
+  - A soft glow sits behind the page, in the gradient's colours.
+  - Panels have hairline light edges.
+  - The selected tab matches its panel's glass.
+  - On wide screens the header is frosted and stays at the top, with its tint running to the window's edges, and the timer column sits under it.
+  - A soft light follows the mouse over task rows and entry cards.
+- With `prefers-reduced-transparency` it's all solid again. Other themes never get glass.
+
+**Decisions**
+- **Lime's accent:** the portfolio's solid colour (#9be36a) left calendar numbers at 4.51:1, right at the limit. It's now #94d862 (4.81:1), almost the same green. The gradient itself is unchanged.
+- **Contrast on glass:** checked for the worst case, a see-through panel over the brightest part of the glow. Text is at least 11.1:1, muted text 5.8:1 and links 5.9:1, in all four gradients.
+- **Phones:** the header isn't sticky there, because it wraps to two rows.
+
+**Tests for this batch** (headless Chrome via its DevTools protocol, all passing, no JS errors):
+- settings and Tasks: 20 checks
+- Pixel and the game: 30 checks, with real mouse drags and timing
+- the tour: 31 checks at 1280/375/320px
+- glass: 13 checks
+
+The earlier suites still pass after updating them for the moved features: Pixel 49, banner/plans 51, Launcher 28, layout 95, phone sweep, features 29.
+
+## 2026-10-18: Pixel moves to the corner; smoother grabbing
+
+**Asked for:** grabbing Pixel felt janky and shifted the timer; put him in the corner like on the portfolio.
+
+**What was wrong**
+- **The timer moving:** while he was being dragged, a "put Pixel on top" rule switched the timer column from sticky to `position: relative`. When the page was scrolled, the timer column jumped.
+- **The jank:** his position was measured from that column, so he jumped with it, and every pointer move re-measured it (a feedback loop).
+- **The squish:** the general "buttons press down" effect also squished him while held.
+- **The twitch:** his tilt jumped with every pointer event.
+
+**Changed**
+- `index.html`: Pixel's markup moved out of the timer card to just after `<main>`. The timer card's status line is back to a plain line.
+- `styles.css`:
+  - `.pixel-wrap` is `position: fixed` in the window's **bottom-left corner, 20px in**: the portfolio's spot (its `.guide` is `left: 20px; bottom: 20px`).
+  - His bubble now opens to his right, and to his left when he's tossed near the right edge (`say-left`).
+  - The `pixel-away` rules are removed, and so is the press effect on him.
+  - `will-change: transform` while he moves.
+  - The undo popup is above him (`z-index: 50` vs his 40).
+- `app.js`:
+  - His corner is measured once (and again after a resize) instead of on every move.
+  - The drag tilt is eased (75/25), so he sways instead of twitching.
+  - An `is-moving` class replaces the body class.
+- CLAUDE.md: Pixel's placement.
+
+**Decisions**
+- **Bottom-left, not bottom-right:** I first tried bottom-right. On phones he then sat on the rows' ▶/■ buttons, which are on the right. The portfolio uses bottom-left anyway, and the left edge is mostly task names.
+- **Trade-off:** a corner robot can be over content while you scroll (as on the portfolio). The page's existing bottom padding lets anything at the end of each tab scroll clear of him (checked on every tab at 1280/375/320).
+- **320×640 phones:** on a phone that small, his corner overlaps part of the "Today" tab when the page first opens. A small scroll clears it. At 375px and on desktop nothing is under him at load.
+
+**Tests:** a new corner test passed all 20 checks, with no JS errors. It covered:
+- he's fixed 20px from the left and bottom and stays there while scrolling
+- nothing is under him at the end of any tab
+- the undo popup and windows go over him
+- grabbing while scrolled moves nothing else on the page
+- he stays exactly under the pointer (0px off)
+- tilt changes are at most 4.7° per move
+- no squish
+- he walks back to his corner after a toss
+
+Earlier tests updated for the corner (drag direction, eye-follow target, placement) and all pass: Pixel 49, Pixel/game 30, tour 31, glass 13, settings 20, layout 95, sweep, banner/plans 51, Launcher 28.

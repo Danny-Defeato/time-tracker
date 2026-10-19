@@ -1,7 +1,8 @@
 /* ---------- Colours ----------
    Themes (Settings → Theme, saved in timeTracker.theme) set data-theme on <html>:
-   none = Auto (follows the device), light, dark, warm, midnight, contrast.
-   The accent colour (data-accent) has a shade for light themes and one for dark themes. */
+   none = Auto (follows the device), light, dark, warm, midnight, contrast, launcher.
+   The accent colour (data-accent) has a shade for light themes and one for dark themes.
+   Launcher ignores it and uses one of 4 gradients instead (data-gradient). */
 
 :root {
   --accent-l: #2563eb; /* blue */
@@ -30,6 +31,7 @@
   --toast-bg: #1c1e21;
   --toast-text: #ffffff;
   --toast-accent: #93c5fd;
+  --raised: var(--bg); /* inputs and small buttons; only Launcher makes it different */
 
   /* Task colours: at least 3:1 against the surface colour. */
   --task-0: #2563eb;
@@ -39,7 +41,7 @@
   --task-4: #0f766e;
   --task-5: #be185d;
   --task-6: #a16207;
-  --task-7: #0369a1;
+  --task-7: #57534e; /* stone: unlike the blue (task-0) */
 
   color-scheme: light;
 }
@@ -70,7 +72,7 @@
     --task-4: #2dd4bf;
     --task-5: #f472b6;
     --task-6: #facc15;
-    --task-7: #38bdf8;
+    --task-7: #cbd5e1; /* slate: unlike any other task colour */
     color-scheme: dark;
   }
 }
@@ -99,7 +101,7 @@
   --task-4: #2dd4bf;
   --task-5: #f472b6;
   --task-6: #facc15;
-  --task-7: #38bdf8;
+  --task-7: #cbd5e1;
   color-scheme: dark;
 }
 
@@ -140,8 +142,49 @@
   --task-4: #115e59;
   --task-5: #9d174d;
   --task-6: #854d0e;
-  --task-7: #075985;
+  --task-7: #404040;
 }
+
+/* Launcher: the game-launcher look of the portfolio site. Dark navy, Sora, 14px corners
+   and a gradient (data-gradient: none = Sunset, ocean, lime, ember). --accent is a light
+   solid colour from the gradient, for links, outlines and anything that needs one colour. */
+:root[data-theme="launcher"] {
+  --bg: #10141f;
+  --surface: #1a2030;
+  --raised: #232b40;
+  --text: #e8ecf6;
+  --muted: #a3adc2;
+  --border: #2e3852;
+  --track: #2a3350;
+  --accent: var(--grad-accent);
+  --accent-text: #10141f;
+  --focus: #ffd166;
+  --warning-bg: #3a2f10;
+  --warning-text: #f5d98a;
+  --danger: #ff8a80;
+  --toast-bg: #e8ecf6;
+  --toast-text: #10141f;
+  --toast-accent: #6d28d9;
+  --task-0: #60a5fa;
+  --task-1: #4ade80;
+  --task-2: #fb923c;
+  --task-3: #a78bfa;
+  --task-4: #2dd4bf;
+  --task-5: #f472b6;
+  --task-6: #facc15;
+  --task-7: #cbd5e1;
+  --grad-1: #ff7a59;
+  --grad-2: #c64bff;
+  --grad-3: #3f6bff;
+  --grad-accent: #d68bff;
+  --gradient: linear-gradient(90deg, var(--grad-1), var(--grad-2), var(--grad-3));
+  --radius: 14px;
+  color-scheme: dark;
+}
+/* The same gradients as the portfolio site. */
+:root[data-theme="launcher"][data-gradient="ocean"] { --grad-1: #12b5a5; --grad-2: #1f9bd1; --grad-3: #3f6bff; --grad-accent: #4fd6e8; }
+:root[data-theme="launcher"][data-gradient="lime"]  { --grad-1: #8fd14f; --grad-2: #2fb37a; --grad-3: #0f8fa3; --grad-accent: #94d862; /* a touch deeper than the portfolio's #9be36a, for calendar contrast */ }
+:root[data-theme="launcher"][data-gradient="ember"] { --grad-1: #ff9f43; --grad-2: #ff5f45; --grad-3: #d6336c; --grad-accent: #ff8a65; }
 
 * {
   box-sizing: border-box;
@@ -221,6 +264,46 @@ section {
 
 /* ---------- Timer ---------- */
 
+.timer-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.timer-heading-row h2 {
+  margin: 0;
+}
+
+/* The pop-out window (same stylesheet, its own small body). */
+.pip-body {
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface);
+}
+
+.pip-task {
+  margin: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pip-clock {
+  font-size: 2.5rem;
+  line-height: 1.1;
+}
+
+.pip-stop {
+  margin-top: 0.5rem;
+}
+
 label {
   display: block;
   font-weight: 600;
@@ -237,7 +320,7 @@ input {
   width: 100%;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
 }
 
@@ -336,6 +419,31 @@ button:focus-visible {
   border-bottom: none;
 }
 
+/* Phones: the time (and goal) goes under the name, with ▶/■ beside both,
+   so a long name or a goal doesn't squeeze the name to a few letters. */
+@media (max-width: 26rem) {
+  .task-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 0;
+  }
+
+  .task-time {
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 0.95rem;
+  }
+
+  .row-button {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+
+  .task-row > .share-bar,
+  .task-row > .bar-line {
+    margin-top: 0.35rem;
+  }
+}
+
 .task-name {
   font-weight: 600;
   overflow-wrap: anywhere;
@@ -349,7 +457,7 @@ button:focus-visible {
   width: 44px;
   height: 44px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
   font-size: 1rem;
   line-height: 1;
@@ -385,6 +493,88 @@ button:focus-visible {
   border-radius: 3px;
 }
 
+/* ---------- Plan my day ---------- */
+
+.today-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+/* Today's rows: the bar, with the plan status next to it. */
+.bar-line {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.bar-line .share-bar {
+  flex: 1;
+  position: relative;
+}
+
+/* With a plan the bar shows progress against the plan: the dashed outline is the plan,
+   the fill is time so far, and time past the plan is red. */
+.task-row.has-plan .share-bar {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.plan-outline,
+.share-over {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 0;
+}
+
+.plan-outline {
+  left: 0;
+  border: 2px dashed var(--muted);
+  border-radius: 5px;
+}
+
+.task-row.has-plan .share-fill {
+  position: relative; /* in front of the outline */
+  z-index: 1;
+}
+
+.share-over {
+  z-index: 1;
+  background: var(--danger);
+  border-radius: 0 5px 5px 0;
+  transition: width 0.35s ease, left 0.35s ease;
+}
+
+.task-row:not(.has-plan) .plan-outline,
+.task-row:not(.has-plan) .share-over {
+  display: none;
+}
+
+.plan-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.plan-status:empty {
+  display: none;
+}
+
+.plan-status.is-on-track {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.plan-status.is-over {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* ---------- Today: entries ---------- */
 
 .entry {
@@ -392,7 +582,8 @@ button:focus-visible {
   grid-template-columns: auto 1fr auto auto auto;
   grid-template-areas:
     "dot task duration edit delete"
-    ".   range duration edit delete";
+    ".   range duration edit delete"
+    ".   note  note     note note";
   align-items: center;
   column-gap: 0.6rem;
   padding: 0.45rem 0;
@@ -401,6 +592,22 @@ button:focus-visible {
 
 .entry:last-child {
   border-bottom: none;
+}
+
+/* Phones: the duration moves under the time range, so the task name has room. */
+@media (max-width: 26rem) {
+  .entry {
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      "dot task     edit delete"
+      ".   range    edit delete"
+      ".   duration edit delete"
+      ".   note     note note";
+  }
+
+  .entry-duration {
+    font-size: 0.9rem;
+  }
 }
 
 .dot {
@@ -425,6 +632,41 @@ button:focus-visible {
 .entry-duration {
   grid-area: duration;
   font-variant-numeric: tabular-nums;
+}
+
+.entry-note-line {
+  grid-area: note;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.25rem;
+  min-width: 0;
+}
+
+.entry-note {
+  margin-right: 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.link-button.note-button {
+  min-height: 32px;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.note-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin-top: 0.25rem;
+}
+
+.note-help {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .edit-button {
@@ -458,6 +700,147 @@ button:focus-visible {
   color: var(--text);
 }
 
+/* ---------- Wide screens: two columns ----------
+   From 60rem (960px) the page widens: the timer card on the left, the tabs on the right.
+   Narrower screens keep the single column. */
+
+@media (min-width: 60rem) {
+  main {
+    max-width: 75rem;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  /* Entries become small cards, in as many columns as fit. A card is phone-narrow, so it
+     uses the phone row layout (duration under the time range). */
+  .entry-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .entry,
+  .entry:last-child {
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      "dot task     edit delete"
+      ".   range    edit delete"
+      ".   duration edit delete"
+      ".   note     note note";
+    align-content: start;
+    padding: 0.6rem 0.4rem 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--raised);
+  }
+}
+
+/* The timer stays in view while the right column scrolls, when the window is tall enough
+   to show all of it. */
+@media (min-width: 60rem) and (min-height: 44rem) {
+  .layout-side {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+/* Two sections next to each other when each can have about 20rem, stacked otherwise
+   (History: calendar | the day; Week: banner | chart, By day | By task). */
+.side-by-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.75rem;
+}
+
+.side-by-side > * {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.side-by-side > * > h3:first-child,
+.side-by-side > .week-banner {
+  margin-top: 0.5rem;
+}
+
+/* ---------- Today by task (ring chart) ---------- */
+
+.today-overview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
+}
+
+.today-rows {
+  flex: 1 1 22rem; /* beside the ring when there's room for both, else below it */
+  min-width: 0;
+}
+
+.today-chart {
+  position: relative;
+  flex: none;
+  width: 12.5rem;
+  margin: 0 auto;
+}
+
+.today-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.today-chart-track,
+.today-chart-segment {
+  fill: none;
+  stroke-width: 20;
+}
+
+.today-chart-track {
+  stroke: var(--track);
+}
+
+.today-chart-segment {
+  transition: stroke-dasharray 0.35s ease, stroke-dashoffset 0.35s ease;
+}
+
+/* The total sits in the hole of the ring. */
+.today-chart-total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.today-chart-total strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-chart-total span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Phones: a smaller ring, centred above the rows. */
+@media (max-width: 26rem) {
+  .today-chart {
+    width: 10rem;
+  }
+
+  .today-chart-total strong {
+    font-size: 0.8rem;
+  }
+}
+
 /* ---------- Tabs ---------- */
 
 .visually-hidden {
@@ -470,9 +853,24 @@ button:focus-visible {
 }
 
 .tabs {
+  position: relative;
   display: flex;
   gap: 0.25rem;
   margin-bottom: -1px; /* tabs sit on the panel's top border */
+}
+
+/* The underline under the selected tab. app.js moves it (left and width) to the
+   selected tab; with motion on it slides there. */
+.tab-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 1px;
+  z-index: 2;
+  width: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  pointer-events: none;
 }
 
 .tab {
@@ -481,7 +879,7 @@ button:focus-visible {
   padding: 0.5rem 0.25rem;
   border: 1px solid var(--border);
   border-radius: 10px 10px 0 0;
-  background: var(--bg);
+  background: var(--raised);
   color: var(--muted);
   font-weight: 600;
 }
@@ -549,6 +947,398 @@ button:focus-visible {
   background: var(--accent);
 }
 
+/* ---------- History calendar ---------- */
+
+.calendar {
+  margin-bottom: 1rem;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.month-title {
+  margin: 0;
+  text-align: center;
+}
+
+.calendar-arrow {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.calendar-weekdays,
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+
+.calendar-weekdays {
+  margin: 0.5rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Shades of the accent colour: 0 none, then under 1h, 1-3h, 3-5h, 5h+. */
+.calendar-day,
+.calendar-swatch {
+  --cal-bg: var(--bg);
+  --cal-text: var(--text);
+  background: var(--cal-bg);
+  color: var(--cal-text);
+}
+
+/* Shades 1-3 stay light enough for normal text (4.5:1 in every theme and accent). */
+.calendar [data-level="1"] { --cal-bg: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+.calendar [data-level="2"] { --cal-bg: color-mix(in srgb, var(--accent) 31%, var(--surface)); }
+.calendar [data-level="3"] { --cal-bg: color-mix(in srgb, var(--accent) 43%, var(--surface)); }
+.calendar [data-level="4"] { --cal-bg: var(--accent); --cal-text: var(--accent-text); }
+
+.calendar-day {
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-day:disabled {
+  opacity: 1; /* future days: just plain squares */
+  background: transparent;
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.calendar-day[aria-current="date"] {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The day shown below gets a thick ring in the text colour. */
+.calendar-day.is-selected {
+  box-shadow: inset 0 0 0 2px var(--text);
+  font-weight: 700;
+}
+
+.calendar-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.calendar-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+/* ---------- Weekly Banner ----------
+   Four slides side by side in a track; only one shows through the window. app.js moves
+   the track; with motion on it slides (0.35s). */
+
+.week-banner {
+  position: relative;
+  margin: 0.25rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+/* A stripe along the top: the accent, or the gradient in Launcher. */
+.week-banner::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: var(--accent);
+}
+
+:root[data-theme="launcher"] .week-banner::before {
+  background: var(--gradient);
+}
+
+.banner-window {
+  overflow: hidden;
+}
+
+.banner-track {
+  display: flex;
+  transition: transform 0.35s ease;
+}
+
+.banner-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 0.85rem 1rem 0.25rem;
+}
+
+.banner-slide p {
+  margin: 0;
+}
+
+.banner-kicker {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.banner-big {
+  margin-top: 0.15rem !important;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* The top task's name gets its colour as a dot in front. */
+.banner-task::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  background: var(--task-color, transparent);
+  vertical-align: 0.1em;
+}
+
+.banner-sub {
+  min-height: 1.5em;
+  margin-top: 0.2rem !important;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.banner-up {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.banner-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.banner-dots {
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* Each dot is a 32px target with a small visible dot inside. */
+.banner-dot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.banner-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+}
+
+.banner-dot[aria-current="true"]::after {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* ---------- Week chart ---------- */
+
+.week-chart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The whole height is the button, so a short column is still easy to tap. */
+.chart-column {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 9rem;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .chart-column:hover {
+    background: var(--track);
+  }
+}
+
+.chart-bar {
+  display: flex;
+  flex-direction: column-reverse; /* first task at the bottom */
+  width: min(100%, 2.5rem);
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+
+.chart-segment {
+  flex: none;
+  background: var(--task-color);
+}
+
+/* A thin gap between stacked tasks, so neighbouring colours stay apart. */
+.chart-segment + .chart-segment {
+  box-shadow: 0 1px 0 var(--surface);
+}
+
+.chart-label {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-day.is-today .chart-label {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Pop-up above the column: on hover, keyboard focus, or after a tap. */
+.chart-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 0; /* app.js moves it over its column, kept inside the chart */
+  z-index: 2;
+  width: max-content;
+  max-width: 15rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.chart-day.is-open .chart-tip,
+.chart-day:not(.is-dismissed) .chart-column:focus-visible + .chart-tip {
+  display: block;
+}
+
+@media (hover: hover) {
+  .chart-day:not(.is-dismissed):hover .chart-tip {
+    display: block;
+  }
+}
+
+.chart-tip-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.chart-tip-title span {
+  white-space: nowrap;
+}
+
+.chart-tip ul {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-tip li,
+.week-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-tip li::before,
+.week-legend li::before {
+  content: "";
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  background: var(--task-color);
+}
+
+.chart-tip li span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.chart-tip-time {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.week-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.week-legend li {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Add time dialog, share buttons ---------- */
 
 .secondary-button,
@@ -570,20 +1360,6 @@ button:focus-visible {
 .action-button {
   background: var(--accent);
   color: var(--accent-text);
-}
-
-#share-heading {
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-#share-heading + .secondary-button {
-  margin-top: 0.5rem;
-}
-
-#backup-heading {
-  margin-top: 1.5rem;
 }
 
 .hint {
@@ -633,7 +1409,7 @@ textarea:focus-visible {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
   font: 0.9rem ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
@@ -660,7 +1436,8 @@ dialog h2 {
   margin-bottom: 1rem;
 }
 
-dialog label {
+dialog label,
+#panel-tasks label {
   margin-top: 0.75rem;
 }
 
@@ -709,6 +1486,7 @@ legend {
 
 .toast {
   position: fixed;
+  z-index: 50; /* over Pixel in his corner */
   left: 50%;
   bottom: 1rem;
   transform: translateX(-50%);
@@ -740,30 +1518,102 @@ legend {
 
 /* ---------- Settings ---------- */
 
-#settings-dialog h3 {
-  margin: 1.5rem 0 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-#settings-dialog h2 + h3 {
-  margin-top: 0.5rem;
+#settings-dialog,
+#plan-dialog {
   padding-top: 0;
-  border-top: none;
 }
 
-#settings-dialog select {
+/* The title and × stay at the top while the window scrolls. */
+.settings-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 -1.25rem;
+  padding: 0.75rem 0.75rem 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.settings-header h2 {
+  margin: 0;
+}
+
+.close-button {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.close-button:hover {
+  border-color: var(--border);
+}
+
+.settings-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-section summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A ▸ that turns to ▾ when the section is open. */
+.settings-section summary::before {
+  content: "▸";
+  content: "▸" / "";
+  width: 1em;
+  color: var(--muted);
+}
+
+.settings-section[open] summary::before {
+  content: "▾";
+  content: "▾" / "";
+}
+
+.settings-section[open] {
+  padding-bottom: 1rem;
+}
+
+.settings-section summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+#settings-dialog select,
+#panel-tasks select {
   width: 100%;
   min-height: 44px;
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
   font: inherit;
 }
 
-#settings-dialog select:focus-visible {
+#settings-dialog select:focus-visible,
+#panel-tasks select:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -849,7 +1699,7 @@ kbd {
   padding: 0 0.3em;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
   font: 0.85rem ui-monospace, "Cascadia Mono", Consolas, monospace;
   text-align: center;
@@ -879,4 +1729,876 @@ kbd {
 .long-timer .secondary-button,
 .long-timer .action-button {
   margin-top: 0.5rem;
+}
+
+/* ---------- Pixel, the companion robot ----------
+   The portfolio's Pixel. data-mood on the button picks his face and loop:
+   asleep (no timer: shut eyes and a drifting "z"), working (timer running: bobbing and
+   typing), norm (awake), happy (hops), mad, dizzy. data-anger (0-4) turns his shell red.
+   He can be tossed: #pixel-home moves by --tx / --ty and the drawing tilts by --tr.
+   His loops are ambient, so they run longer than the half-second UI motion; "Show Pixel"
+   hides him, and reduced motion stops them (and tossing). */
+
+/* His spot: the window's bottom-left corner, 20px in, like on the portfolio. Fixed, so tossing
+   him never moves anything on the page, and he's always above it (windows and the undo
+   popup still go over him). main's bottom padding lets anything scroll out from under him. */
+.pixel-wrap {
+  position: fixed;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  width: 56px;
+  height: 64px;
+}
+
+.pixel-home {
+  position: absolute;
+  inset: 0;
+  transform: translate(var(--tx, 0px), var(--ty, 0px));
+}
+
+.pixel-home.is-moving {
+  will-change: transform;
+}
+
+/* Walking back to his spot after a toss. */
+.pixel-home.is-walking {
+  transition: transform 0.9s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.pixel {
+  --pixel-shell: color-mix(in srgb, var(--text) 10%, var(--surface));
+  --pixel-edge: color-mix(in srgb, var(--text) 60%, var(--surface));
+  --pixel-eye: #7dd3fc;
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  touch-action: none; /* a drag moves him, not the page */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (hover: hover) {
+  .pixel:hover {
+    border-color: var(--border);
+  }
+}
+
+.pixel,
+.pixel:not(:disabled):active {
+  transform: none;
+  transition: none;
+}
+
+.pix-svg {
+  forced-color-adjust: none; /* a drawing: keep its colours in high-contrast mode */
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 44px;
+  height: 48px;
+  margin-left: -22px;
+  overflow: visible;
+  transform: rotate(var(--tr, 0deg));
+}
+
+.pix-line { stroke: var(--pixel-edge); stroke-width: 2; }
+.pix-light { fill: var(--accent); }
+.pix-shell { fill: var(--pixel-shell); stroke: var(--pixel-edge); stroke-width: 2; transition: fill 0.4s, stroke 0.4s; }
+.pix-screen { fill: #0c0f19; }
+.pix-eye { fill: var(--pixel-eye); }
+.pix-face { display: none; fill: none; stroke: var(--pixel-eye); stroke-width: 2.2; stroke-linecap: round; }
+.pix-face-mad path { fill: var(--pixel-eye); stroke: none; }
+.pix-eyes { transition: transform 0.08s linear; }
+
+/* One face at a time. */
+.pixel[data-mood="happy"] .pix-eyes,
+.pixel[data-mood="mad"] .pix-eyes,
+.pixel[data-mood="dizzy"] .pix-eyes,
+.pixel[data-mood="asleep"] .pix-eyes { display: none; }
+.pixel[data-mood="happy"] .pix-face-happy,
+.pixel[data-mood="mad"] .pix-face-mad,
+.pixel[data-mood="dizzy"] .pix-face-dizzy,
+.pixel[data-mood="asleep"] .pix-face-sleep { display: inline; }
+.pixel[data-mood="asleep"] .pix-light { fill: var(--muted); }
+
+/* His temper: the shell warms up stage by stage (data-anger 2-4). */
+.pixel[data-anger="2"] { --pixel-shell: color-mix(in srgb, #ff8a80 18%, var(--surface)); }
+.pixel[data-anger="3"] { --pixel-shell: color-mix(in srgb, #ff5f6d 32%, var(--surface)); --pixel-edge: #ff8a80; --pixel-eye: #ff8a80; }
+.pixel[data-anger="4"] { --pixel-shell: color-mix(in srgb, #ff5f6d 50%, var(--surface)); --pixel-edge: #ff5f6d; --pixel-eye: #ff5f6d; }
+
+/* The rage meter: above his head, only once he's annoyed (data-anger 1+). */
+.pixel-meter {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -6px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pixel-meter span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: #facc15;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.pixel-home.is-annoyed .pixel-meter { opacity: 1; }
+.pixel-home[data-anger="2"] .pixel-meter span { background: #fb923c; }
+.pixel-home[data-anger="3"] .pixel-meter span,
+.pixel-home[data-anger="4"] .pixel-meter span { background: #ff5f6d; }
+
+/* A tiny keyboard, only while working. */
+.pixel-desk {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 44px;
+  height: 5px;
+  margin-left: -22px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, var(--pixel-edge) 0 5px, transparent 5px 7px);
+  opacity: 0;
+}
+
+.pixel-z {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+}
+
+.pixel[data-mood="asleep"] .pixel-z {
+  opacity: 1;
+  animation: pixel-z 2.4s ease-in-out infinite;
+}
+
+.pixel[data-mood="working"] .pix-svg {
+  animation: pixel-bob 0.45s ease-in-out infinite alternate;
+}
+
+.pixel[data-mood="working"] .pixel-desk {
+  opacity: 1;
+  animation: pixel-type 0.22s steps(2) infinite;
+}
+
+.pixel[data-mood="happy"] .pix-svg { animation: pixel-hop 0.5s ease-out 3; }
+.pixel.is-hopping .pix-svg { animation: pixel-hop 0.5s ease-out; }
+.pixel.is-shaking .pix-svg { animation: pixel-shake 0.65s ease-in-out; }
+.pixel.is-dragging { cursor: grabbing; }
+.pixel.is-dragging .pix-svg { animation: none; }
+
+@keyframes pixel-z {
+  0% { opacity: 0; transform: translate(-6px, 10px) scale(0.7); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(4px, -10px) scale(1.1); }
+}
+
+@keyframes pixel-bob {
+  to { translate: 0 -3px; }
+}
+
+@keyframes pixel-type {
+  50% { filter: brightness(1.6); }
+}
+
+@keyframes pixel-hop {
+  0%, 100% { translate: 0 0; scale: 1 1; }
+  15% { translate: 0 0; scale: 1.08 0.92; }
+  50% { translate: 0 -10px; scale: 0.96 1.04; }
+}
+
+@keyframes pixel-shake {
+  0%, 100% { translate: 0 0; }
+  20%, 60% { translate: -3px 0; }
+  40%, 80% { translate: 3px 0; }
+}
+
+/* Steam puffs when he's furious (placed by app.js, removed after a second). */
+.pixel-steam {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+  pointer-events: none;
+  animation: pixel-steam 1s ease-out forwards;
+}
+
+@keyframes pixel-steam {
+  from { opacity: 0.9; transform: translateY(0) scale(0.6); }
+  to { opacity: 0; transform: translateY(-26px) scale(1.4); }
+}
+
+/* Speech bubble: to Pixel's right, or his left when he's tossed near the right edge.
+   Taps go straight through it. */
+.pixel-bubble {
+  position: absolute;
+  left: calc(100% + 10px);
+  bottom: 10px;
+  z-index: 3;
+  width: max-content;
+  max-width: min(15rem, calc(100vw - 9rem));
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pixel-bubble:empty {
+  padding: 0;
+  border: none;
+}
+
+.pixel-bubble.is-showing {
+  opacity: 1;
+  transform: none;
+}
+
+/* The little tail pointing at Pixel. */
+.pixel-bubble.is-showing::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 14px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--raised);
+  transform: rotate(-135deg);
+}
+
+.pixel-home.say-left .pixel-bubble {
+  left: auto;
+  right: calc(100% + 10px);
+}
+
+.pixel-home.say-left .pixel-bubble.is-showing::after {
+  left: auto;
+  right: -6px;
+  transform: rotate(45deg);
+}
+
+/* ---------- Pixel's tour ----------
+   The window covers the screen (see-through); the spotlight's huge shadow dims everything
+   except the part being explained, and the card sits beside it (placed by app.js). */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overflow: hidden;
+}
+
+.tour::backdrop {
+  background: transparent;
+}
+
+.tour-spot {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 4000px rgb(5 7 12 / 0.72);
+  pointer-events: none;
+  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+
+.tour-card {
+  position: fixed;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  width: min(27rem, calc(100vw - 32px));
+  transition: top 0.3s ease, left 0.3s ease;
+}
+
+.tour-pixel {
+  --pixel-shell: color-mix(in srgb, var(--text) 10%, var(--surface));
+  --pixel-edge: color-mix(in srgb, var(--text) 60%, var(--surface));
+  position: static;
+  flex: none;
+  width: 52px;
+  height: 60px;
+  margin: 0;
+  transform: none;
+}
+
+.tour-flame { fill: #ffd36e; stroke: #ff7a59; stroke-width: 1.5; }
+.tour-pixel-face { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; }
+
+.tour-bubble {
+  flex: 1;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: 0 24px 48px -16px rgb(0 0 0 / 0.6);
+}
+
+.tour-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tour-step {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tour-dots {
+  display: flex;
+  flex: none;
+  gap: 5px;
+}
+
+.tour-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.tour-dots i.is-current {
+  width: 18px;
+  background: var(--accent);
+}
+
+.tour-text {
+  margin: 0.5rem 0 0;
+  line-height: 1.5;
+}
+
+.tour-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.tour-buttons .link-button {
+  padding: 0;
+  color: var(--muted);
+}
+
+.tour-buttons .header-button {
+  margin-left: auto;
+  min-height: 44px;
+}
+
+.tour-next {
+  min-height: 44px;
+  padding: 0 1.2rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+:root[data-theme="launcher"] .tour-next {
+  border-color: transparent;
+  background: var(--gradient);
+}
+
+/* ---------- Pixel's game: Stop the Clock ---------- */
+
+.clock-game {
+  width: min(32rem, calc(100% - 32px));
+  padding-top: 0;
+  border-color: color-mix(in srgb, #ff5f6d 45%, var(--border));
+  text-align: center;
+}
+
+.game-rules {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.game-rules strong {
+  color: var(--text);
+}
+
+.game-face {
+  position: relative;
+  width: 13rem;
+  max-width: 100%;
+  margin: 1rem auto 0;
+}
+
+.game-ring {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.game-ring-track,
+.game-ring-fill {
+  fill: none;
+  stroke-width: 10;
+}
+
+.game-ring-track { stroke: var(--track); }
+
+.game-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 0 540.4;
+}
+
+:root[data-theme="launcher"] .game-ring-fill { stroke: var(--grad-2); }
+
+.game-ring-mark {
+  stroke: var(--text);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.game-readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-try,
+.game-target {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.game-try {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.game-clock {
+  font-size: 3.2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-button {
+  width: 100%;
+  max-width: 20rem;
+  min-height: 56px;
+  margin-top: 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+:root[data-theme="launcher"] .game-button {
+  border-color: transparent;
+  background: var(--gradient);
+}
+
+.game-tries {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-tries li {
+  padding: 0.5rem 0.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.game-tries li strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-tries li.is-hit { border: 1px solid var(--accent); }
+.game-tries li.is-miss { border: 1px solid var(--danger); }
+.game-tries li.is-hit span { color: var(--accent); font-weight: 600; }
+.game-tries li.is-miss span { color: var(--danger); font-weight: 600; }
+
+.game-pixel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.game-pixel-svg {
+  position: static;
+  flex: none;
+  width: 52px;
+  height: 56px;
+  margin: 0;
+  transform: none;
+  --pixel-shell: color-mix(in srgb, #ff5f6d 32%, var(--surface));
+  --pixel-edge: #ff8a80;
+}
+
+.game-pixel-face { fill: #ff8a80; }
+.game-pixel-happy { display: none; fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; }
+/* Won: he cools down (normal shell) and smiles. */
+.clock-game.is-calm .game-pixel-svg { --pixel-shell: color-mix(in srgb, var(--text) 10%, var(--surface)); --pixel-edge: color-mix(in srgb, var(--text) 60%, var(--surface)); }
+.clock-game.is-calm .game-pixel-face { display: none; }
+.clock-game.is-calm .game-pixel-happy { display: inline; }
+
+.game-say {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+  font-weight: 600;
+}
+
+.game-say:empty {
+  display: none;
+}
+
+/* "Show Pixel": a checkbox drawn as a switch (role="switch" in the HTML). */
+.switch input {
+  appearance: none;
+  position: relative;
+  width: 2.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--muted);
+  border-radius: 1rem;
+  background: var(--raised);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.switch input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.4rem - 8px);
+  height: calc(1.4rem - 8px);
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.switch input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.switch input:checked::before {
+  background: var(--accent-text);
+  transform: translateX(1rem);
+}
+
+/* Launcher: his eyes and antenna light take the gradient's colour. */
+:root[data-theme="launcher"] .pixel {
+  --pixel-eye: var(--grad-accent);
+}
+
+:root[data-theme="launcher"] .pixel:not([data-mood="asleep"]) .pix-light {
+  fill: var(--grad-2);
+}
+
+/* ---------- Launcher theme: shapes, font and gradient ---------- */
+
+:root[data-theme="launcher"] body {
+  font-family: "Sora", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-theme="launcher"] section,
+:root[data-theme="launcher"] dialog {
+  border-radius: var(--radius);
+}
+
+:root[data-theme="launcher"] .panel {
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+:root[data-theme="launcher"] .tab {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+:root[data-theme="launcher"] input,
+:root[data-theme="launcher"] button:not(.chart-column),
+:root[data-theme="launcher"] #settings-dialog select,
+:root[data-theme="launcher"] #panel-tasks select {
+  border-radius: 10px;
+}
+
+/* The gradient: app title, Start button, tab underline and By day bars. */
+:root[data-theme="launcher"] h1 {
+  width: fit-content;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme="launcher"] #start-button {
+  background: var(--gradient);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+:root[data-theme="launcher"] .tab-indicator,
+:root[data-theme="launcher"] .week-fill {
+  background: var(--gradient);
+}
+
+/* A soft glow around the timer card while a timer runs. */
+:root[data-theme="launcher"] .timer-card.is-running {
+  border-color: color-mix(in srgb, var(--grad-2) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--grad-2) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--grad-2) 30%, transparent);
+}
+
+/* Windows high-contrast mode drops backgrounds, which would leave the title invisible. */
+@media (forced-colors: active) {
+  :root[data-theme="launcher"] h1 {
+    background: none;
+    color: CanvasText;
+  }
+}
+
+/* ---------- Launcher theme: the portfolio's glass look ----------
+   Panels are frosted glass over a soft glow (the gradient's colours), with hairline light
+   edges, a frosted header on wide screens and a light that follows the mouse over rows.
+   Launcher only, and solid again when the device asks for reduced transparency. */
+
+@media not (prefers-reduced-transparency: reduce) {
+  :root[data-theme="launcher"] {
+    --glass: color-mix(in srgb, var(--surface) 62%, transparent);
+    --glass-raised: color-mix(in srgb, var(--raised) 70%, transparent);
+    --glass-edge: rgb(255 255 255 / 0.09);
+    --glass-shine: inset 0 1px 0 rgb(255 255 255 / 0.07);
+  }
+
+  :root[data-theme="launcher"] body {
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse 70% 45% at 88% -8%, color-mix(in srgb, var(--grad-2) 30%, transparent), transparent 70%),
+      radial-gradient(ellipse 55% 40% at 5% 105%, color-mix(in srgb, var(--grad-3) 22%, transparent), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  :root[data-theme="launcher"] section,
+  :root[data-theme="launcher"] dialog:not(.tour) {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border-color: var(--glass-edge);
+    box-shadow: var(--glass-shine), 0 24px 48px -24px rgb(0 0 0 / 0.7);
+  }
+
+  /* The running timer's glow stays on top of the glass edge. */
+  :root[data-theme="launcher"] .timer-card.is-running {
+    border-color: color-mix(in srgb, var(--grad-2) 55%, transparent);
+    box-shadow: var(--glass-shine), 0 0 0 1px color-mix(in srgb, var(--grad-2) 35%, transparent),
+      0 0 28px color-mix(in srgb, var(--grad-2) 30%, transparent);
+  }
+
+  /* The selected tab is the same glass as its panel, so they still read as one piece. */
+  :root[data-theme="launcher"] .tab {
+    background: var(--glass-raised);
+    border-color: var(--glass-edge);
+  }
+
+  :root[data-theme="launcher"] .tab[aria-selected="true"] {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border-bottom-color: transparent;
+  }
+
+  :root[data-theme="launcher"] .week-banner,
+  :root[data-theme="launcher"] .header-button {
+    background: var(--glass-raised);
+    border-color: var(--glass-edge);
+  }
+
+  :root[data-theme="launcher"] .task-row,
+  :root[data-theme="launcher"] .entry {
+    position: relative;
+  }
+
+  /* Wide screens: the header is frosted and stays at the top. */
+  @media (min-width: 60rem) {
+    :root[data-theme="launcher"] .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      margin: -1.5rem -16px 1rem;
+      padding: 1rem 16px;
+      background: color-mix(in srgb, var(--bg) 72%, transparent);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      /* The tint runs to the window's edges (a clipped shadow, so the page doesn't widen). */
+      box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--bg) 72%, transparent);
+      clip-path: inset(0 -100vmax);
+    }
+
+    :root[data-theme="launcher"] .layout-side {
+      top: 5.5rem; /* below the frosted header */
+    }
+  }
+
+  /* A soft light that follows the mouse over task rows and entry cards (app.js sets
+     --gx / --gy). Mouse and trackpad only. */
+  @media (hover: hover) {
+    :root[data-theme="launcher"] .task-row:hover::after,
+    :root[data-theme="launcher"] .entry:hover::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgb(255 255 255 / 0.1), transparent 60%);
+      pointer-events: none;
+    }
+  }
+}
+
+/* ---------- Motion (every theme) ----------
+   Only looks: nothing waits on these, and each is under half a second.
+   All of it is off when the device asks for reduced motion (bottom of this section). */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px) scale(0.96); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+}
+
+@keyframes slide-out {
+  to { opacity: 0; transform: translateX(24px); }
+}
+
+.tab-indicator.is-ready {
+  transition: left 0.3s ease, width 0.3s ease;
+}
+
+.panel:not([hidden]) {
+  animation: rise-in 0.25s ease-out;
+}
+
+.share-fill {
+  transition: width 0.35s ease;
+}
+
+.chart-bar {
+  transition: height 0.35s ease;
+}
+
+.calendar-day {
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.1s ease;
+}
+
+.entry.is-entering {
+  animation: slide-in 0.3s ease-out;
+}
+
+.entry.is-leaving {
+  animation: slide-out 0.22s ease-in forwards;
+}
+
+button {
+  transition: transform 0.1s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px) scale(0.98);
+}
+
+dialog[open] {
+  animation: pop-in 0.2s ease-out;
+}
+
+dialog[open]::backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+
+.toast:not([hidden]) {
+  animation: toast-in 0.25s ease-out;
+}
+
+.timer-card {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::backdrop {
+    animation: none !important;
+    transition: none !important;
+  }
 }

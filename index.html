@@ -5,17 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Time Tracker</title>
   <script>
-    // Apply the saved theme and accent before the page draws, so they don't flash.
+    // Apply the saved theme, accent and gradient before the page draws, so they don't flash.
+    // New visitors (no theme chosen and no saved times) get Launcher, like app.js decides.
+    var root = document.documentElement;
     try {
       var savedTheme = localStorage.getItem("timeTracker.theme");
-      if (["light", "dark", "warm", "midnight", "contrast"].indexOf(savedTheme) !== -1) {
-        document.documentElement.dataset.theme = savedTheme;
+      if (savedTheme === null && localStorage.getItem("timeTracker.v1") === null) savedTheme = "launcher";
+      if (["light", "dark", "warm", "midnight", "contrast", "launcher"].indexOf(savedTheme) !== -1) {
+        root.dataset.theme = savedTheme;
       }
       var savedAccent = localStorage.getItem("timeTracker.accent");
       if (["green", "purple", "orange", "pink", "teal"].indexOf(savedAccent) !== -1) {
-        document.documentElement.dataset.accent = savedAccent;
+        root.dataset.accent = savedAccent;
       }
-    } catch (err) {}
+      var savedGradient = localStorage.getItem("timeTracker.gradient");
+      if (["ocean", "lime", "ember"].indexOf(savedGradient) !== -1) {
+        root.dataset.gradient = savedGradient;
+      }
+    } catch (err) {
+      root.dataset.theme = "launcher"; // storage blocked: treat as a new visitor
+    }
+    // Launcher's font comes from Google Fonts, and only while Launcher is on.
+    if (root.dataset.theme === "launcher") {
+      var font = document.createElement("link");
+      font.id = "launcher-font";
+      font.rel = "stylesheet";
+      font.href = "https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap";
+      document.head.appendChild(font);
+    }
   </script>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
@@ -32,97 +49,246 @@
       Storage is blocked, so data won't be kept after you close this page.
     </p>
 
-    <section aria-labelledby="timer-heading">
-      <h2 id="timer-heading">Timer</h2>
+    <!-- Wide screens: the timer on the left (it stays in view), the tabs on the right.
+         Narrow screens: one column, as before. -->
+    <div class="layout">
+      <div class="layout-side">
+        <section class="timer-card" aria-labelledby="timer-heading">
+          <div class="timer-heading-row">
+            <h2 id="timer-heading">Timer</h2>
+            <button id="pop-out-button" class="header-button" type="button" hidden>Pop out</button>
+          </div>
 
-      <form id="timer-form">
-        <label for="task-input">What are you working on?</label>
-        <input id="task-input" type="text" list="task-suggestions" autocomplete="off"
-               placeholder="e.g. Studying">
-        <datalist id="task-suggestions"></datalist>
+          <form id="timer-form">
+            <label for="task-input">What are you working on?</label>
+            <input id="task-input" type="text" list="task-suggestions" autocomplete="off"
+                   placeholder="e.g. Studying">
+            <datalist id="task-suggestions"></datalist>
 
-        <div class="buttons">
-          <button id="start-button" type="submit">Start</button>
-          <button id="stop-button" type="button" disabled>Stop</button>
-        </div>
-      </form>
+            <div class="buttons">
+              <button id="start-button" type="submit">Start</button>
+              <button id="stop-button" type="button" disabled>Stop</button>
+            </div>
+          </form>
 
-      <div class="timer-display">
-        <p id="running-task" class="running-task">Type what you're working on, then press Start.</p>
-        <p id="clock" class="clock" role="timer">00:00</p>
+          <div class="timer-display">
+            <p id="running-task" class="running-task">Type what you're working on, then press Start.</p>
+            <p id="clock" class="clock" role="timer">00:00</p>
+          </div>
+
+          <p id="status" class="status" role="status"></p>
+
+          <div id="long-timer" class="long-timer" role="alert" hidden>
+            <p id="long-timer-text"></p>
+            <div class="dialog-buttons">
+              <button id="long-keep" class="secondary-button" type="button">Keep going</button>
+              <button id="long-stop" class="action-button" type="button">Stop now</button>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <p id="status" class="status" role="status"></p>
-
-      <div id="long-timer" class="long-timer" role="alert" hidden>
-        <p id="long-timer-text"></p>
-        <div class="dialog-buttons">
-          <button id="long-keep" class="secondary-button" type="button">Keep going</button>
-          <button id="long-stop" class="action-button" type="button">Stop now</button>
+      <div class="layout-main">
+        <div class="tabs" role="tablist" aria-label="Views">
+          <span id="tab-indicator" class="tab-indicator" aria-hidden="true"></span>
+          <button id="tab-today" class="tab" type="button" role="tab" aria-controls="panel-today" aria-selected="true">Today</button>
+          <button id="tab-history" class="tab" type="button" role="tab" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
+          <button id="tab-week" class="tab" type="button" role="tab" aria-controls="panel-week" aria-selected="false" tabindex="-1">Week</button>
+          <button id="tab-tasks" class="tab" type="button" role="tab" aria-controls="panel-tasks" aria-selected="false" tabindex="-1">Tasks</button>
         </div>
-      </div>
-    </section>
 
-    <div class="tabs" role="tablist" aria-label="Views">
-      <button id="tab-today" class="tab" type="button" role="tab" aria-controls="panel-today" aria-selected="true">Today</button>
-      <button id="tab-history" class="tab" type="button" role="tab" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
-      <button id="tab-week" class="tab" type="button" role="tab" aria-controls="panel-week" aria-selected="false" tabindex="-1">Week</button>
+        <section id="panel-today" class="panel" role="tabpanel" aria-labelledby="tab-today">
+          <h2 id="today-heading" class="visually-hidden">Today</h2>
+          <div class="today-tools">
+            <button id="plan-button" class="header-button" type="button">Plan my day</button>
+          </div>
+          <div class="today-overview">
+            <!-- Today by task: a ring of the same numbers as the rows (their colour stripes are its legend). -->
+            <figure id="today-chart" class="today-chart" hidden>
+              <svg viewBox="0 0 200 200" role="img" aria-labelledby="today-chart-label">
+                <title id="today-chart-label">Today by task</title>
+                <circle class="today-chart-track" cx="100" cy="100" r="70"></circle>
+                <g id="today-chart-segments" transform="rotate(-90 100 100)"></g>
+              </svg>
+              <figcaption class="today-chart-total"><strong id="today-chart-total">0h 00m 00s</strong><span>today</span></figcaption>
+            </figure>
+            <div class="today-rows">
+              <p id="today-empty" class="empty">Nothing tracked today yet.</p>
+              <ul id="task-rows" class="task-rows"></ul>
+            </div>
+          </div>
+
+          <h3 id="entries-heading">Entries</h3>
+          <p id="entries-empty" class="empty">No entries yet today.</p>
+          <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
+
+          <button id="add-today-button" class="secondary-button" type="button">+ Add time you forgot to track</button>
+        </section>
+
+        <section id="panel-history" class="panel" role="tabpanel" aria-labelledby="tab-history" hidden>
+          <h2 id="history-heading" class="visually-hidden">History</h2>
+          <!-- Calendar and the day's rows: side by side when there's room. -->
+          <div class="side-by-side">
+            <div class="history-pick">
+              <div class="calendar">
+                <div class="calendar-nav">
+                  <button id="month-prev" class="calendar-arrow" type="button" aria-label="Previous month">‹</button>
+                  <h3 id="month-title" class="month-title" aria-live="polite"></h3>
+                  <button id="month-next" class="calendar-arrow" type="button" aria-label="Next month">›</button>
+                </div>
+                <div class="calendar-weekdays" aria-hidden="true">
+                  <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                </div>
+                <div id="calendar-days" class="calendar-days" role="group" aria-labelledby="month-title"></div>
+                <p class="calendar-key" aria-hidden="true">
+                  <span class="key-item"><span class="calendar-swatch" data-level="0"></span>none</span>
+                  <span class="key-item"><span class="calendar-swatch" data-level="1"></span>under 1h</span>
+                  <span class="key-item"><span class="calendar-swatch" data-level="2"></span>1–3h</span>
+                  <span class="key-item"><span class="calendar-swatch" data-level="3"></span>3–5h</span>
+                  <span class="key-item"><span class="calendar-swatch" data-level="4"></span>5h+</span>
+                </p>
+              </div>
+              <label for="history-date">Day</label>
+              <input id="history-date" type="date">
+            </div>
+            <div class="history-day">
+              <p class="section-total">Total <strong id="history-total">0h 00m 00s</strong></p>
+              <p id="history-empty" class="empty">Nothing tracked on this day.</p>
+              <ul id="history-rows" class="task-rows"></ul>
+            </div>
+          </div>
+          <div id="history-entries-block">
+            <h3 id="history-entries-heading">Entries</h3>
+            <ul id="history-entries" class="entry-list" aria-labelledby="history-entries-heading"></ul>
+          </div>
+
+          <button id="add-history-button" class="secondary-button" type="button">+ Add time to this day</button>
+        </section>
+
+        <section id="panel-week" class="panel" role="tabpanel" aria-labelledby="tab-week" hidden>
+          <h2 id="week-heading">Last 7 days</h2>
+          <p class="section-total">Total <strong id="week-total">0h 00m 00s</strong></p>
+          <!-- Banner and chart, then By day and By task: side by side when there's room. -->
+          <div class="side-by-side">
+            <div id="week-banner" class="week-banner" role="region" aria-roledescription="carousel" aria-label="Weekly banner">
+              <div class="banner-window">
+                <div id="banner-track" class="banner-track">
+                  <div class="banner-slide" role="group" aria-roledescription="slide" aria-label="1 of 4: Total time">
+                    <p class="banner-kicker">Total this week</p>
+                    <p id="banner-total" class="banner-big"></p>
+                    <p id="banner-total-sub" class="banner-sub"></p>
+                  </div>
+                  <div class="banner-slide" role="group" aria-roledescription="slide" aria-label="2 of 4: Top task">
+                    <p class="banner-kicker">Top task</p>
+                    <p id="banner-top" class="banner-big banner-task"></p>
+                    <p id="banner-top-sub" class="banner-sub"></p>
+                  </div>
+                  <div class="banner-slide" role="group" aria-roledescription="slide" aria-label="3 of 4: Longest session">
+                    <p class="banner-kicker">Longest single session</p>
+                    <p id="banner-longest" class="banner-big"></p>
+                    <p id="banner-longest-sub" class="banner-sub"></p>
+                  </div>
+                  <div class="banner-slide" role="group" aria-roledescription="slide" aria-label="4 of 4: Busiest day">
+                    <p class="banner-kicker">Busiest day</p>
+                    <p id="banner-busiest" class="banner-big"></p>
+                    <p id="banner-busiest-sub" class="banner-sub"></p>
+                  </div>
+                </div>
+              </div>
+              <div class="banner-controls">
+                <button id="banner-prev" class="calendar-arrow" type="button" aria-label="Previous slide">‹</button>
+                <div class="banner-dots">
+                  <button class="banner-dot" type="button" aria-label="Slide 1: Total time"></button>
+                  <button class="banner-dot" type="button" aria-label="Slide 2: Top task"></button>
+                  <button class="banner-dot" type="button" aria-label="Slide 3: Longest session"></button>
+                  <button class="banner-dot" type="button" aria-label="Slide 4: Busiest day"></button>
+                </div>
+                <button id="banner-next" class="calendar-arrow" type="button" aria-label="Next slide">›</button>
+              </div>
+              <p id="banner-announce" class="visually-hidden" aria-live="polite"></p>
+            </div>
+            <div id="week-chart-block">
+              <h3 id="week-chart-heading">Each day by task</h3>
+              <p class="hint">Hover over or tap a column to see its times.</p>
+              <ul id="week-chart" class="week-chart" aria-labelledby="week-chart-heading"></ul>
+              <ul id="week-legend" class="week-legend" aria-label="Task colours"></ul>
+            </div>
+          </div>
+          <div class="side-by-side">
+            <div>
+              <h3 id="week-days-heading">By day</h3>
+              <ul id="week-days" class="week-days" aria-labelledby="week-days-heading"></ul>
+            </div>
+            <div>
+              <h3 id="week-tasks-heading">By task</h3>
+              <p id="week-empty" class="empty">Nothing tracked in the last 7 days.</p>
+              <ul id="week-tasks" class="task-rows" aria-labelledby="week-tasks-heading"></ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-tasks" class="panel" role="tabpanel" aria-labelledby="tab-tasks" hidden>
+          <h2 id="tasks-heading" class="visually-hidden">Tasks</h2>
+          <div class="side-by-side">
+            <div>
+              <h3 id="goals-heading">Daily goals</h3>
+              <p class="hint">Set a target for a task. Today shows how close you are.</p>
+              <ul id="goal-list" class="goal-list"></ul>
+              <label for="goal-task">Task</label>
+              <input id="goal-task" type="text" list="task-suggestions" autocomplete="off" aria-describedby="goal-message">
+              <fieldset>
+                <legend>Goal each day</legend>
+                <div class="duration-pair">
+                  <label for="goal-hours"><input id="goal-hours" type="number" min="0" max="24" step="1" inputmode="numeric" value="1" aria-describedby="goal-message"> hours</label>
+                  <label for="goal-minutes"><input id="goal-minutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-describedby="goal-message"> minutes</label>
+                </div>
+              </fieldset>
+              <button id="goal-save" class="secondary-button" type="button">Set goal</button>
+              <p id="goal-message" class="form-message" role="status"></p>
+            </div>
+            <div>
+              <h3 id="rename-heading">Rename or merge a task</h3>
+              <p class="hint">Fixes a name everywhere. Renaming to a name you already use merges the two.</p>
+              <label for="rename-from">Task</label>
+              <select id="rename-from" aria-describedby="rename-message"></select>
+              <label for="rename-to">New name</label>
+              <input id="rename-to" type="text" list="task-suggestions" autocomplete="off" aria-describedby="rename-message">
+              <button id="rename-save" class="secondary-button" type="button">Rename</button>
+              <p class="form-message-row"><span id="rename-message" class="form-message" role="status"></span>
+                <button id="rename-undo" class="link-button" type="button" hidden>Undo</button></p>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
-
-    <section id="panel-today" class="panel" role="tabpanel" aria-labelledby="tab-today">
-      <h2 id="today-heading" class="visually-hidden">Today</h2>
-      <p id="today-empty" class="empty">Nothing tracked today yet.</p>
-      <ul id="task-rows" class="task-rows"></ul>
-
-      <h3 id="entries-heading">Entries</h3>
-      <p id="entries-empty" class="empty">No entries yet today.</p>
-      <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
-
-      <button id="add-today-button" class="secondary-button" type="button">+ Add time you forgot to track</button>
-    </section>
-
-    <section id="panel-history" class="panel" role="tabpanel" aria-labelledby="tab-history" hidden>
-      <h2 id="history-heading" class="visually-hidden">History</h2>
-      <label for="history-date">Day</label>
-      <input id="history-date" type="date">
-      <p class="section-total">Total <strong id="history-total">0h 00m 00s</strong></p>
-      <p id="history-empty" class="empty">Nothing tracked on this day.</p>
-      <ul id="history-rows" class="task-rows"></ul>
-      <div id="history-entries-block">
-        <h3 id="history-entries-heading">Entries</h3>
-        <ul id="history-entries" class="entry-list" aria-labelledby="history-entries-heading"></ul>
-      </div>
-
-      <button id="add-history-button" class="secondary-button" type="button">+ Add time to this day</button>
-
-      <h3 id="share-heading">Share</h3>
-      <button id="copy-button" class="secondary-button" type="button">Copy this day as text</button>
-      <label class="checkbox"><input id="youtrack-check" type="checkbox"> Use YouTrack format</label>
-      <p id="copy-message" class="form-message" role="status"></p>
-      <textarea id="copy-fallback" class="copy-fallback" rows="5" readonly aria-label="Text to copy" hidden></textarea>
-
-      <button id="export-button" class="secondary-button" type="button">Download all entries for Excel</button>
-      <p id="export-message" class="form-message" role="status"></p>
-
-      <h3 id="backup-heading">Backup</h3>
-      <p class="hint">Your times are saved only in this browser. Keep a backup file in case you clear
-        your browser data or switch devices.</p>
-      <button id="backup-button" class="secondary-button" type="button">Download a backup</button>
-      <button id="restore-button" class="secondary-button" type="button">Restore from a backup</button>
-      <input id="restore-input" type="file" accept=".json,application/json" hidden>
-      <p id="backup-message" class="form-message" role="status"></p>
-    </section>
-
-    <section id="panel-week" class="panel" role="tabpanel" aria-labelledby="tab-week" hidden>
-      <h2 id="week-heading">Last 7 days</h2>
-      <p class="section-total">Total <strong id="week-total">0h 00m 00s</strong></p>
-      <h3 id="week-days-heading">By day</h3>
-      <ul id="week-days" class="week-days" aria-labelledby="week-days-heading"></ul>
-      <h3 id="week-tasks-heading">By task</h3>
-      <p id="week-empty" class="empty">Nothing tracked in the last 7 days.</p>
-      <ul id="week-tasks" class="task-rows" aria-labelledby="week-tasks-heading"></ul>
-    </section>
   </main>
+
+  <!-- Pixel lives in the window's bottom-left corner, like on the portfolio (fixed, so
+       nothing on the page moves around him). #pixel-home moves when he's tossed. -->
+  <div id="pixel-wrap" class="pixel-wrap">
+    <div id="pixel-home" class="pixel-home">
+      <p id="pixel-bubble" class="pixel-bubble" aria-hidden="true"></p>
+      <span class="pixel-meter" aria-hidden="true"><span id="pixel-meter-fill"></span></span>
+      <button id="pixel" class="pixel" type="button" data-mood="asleep" data-anger="0" aria-label="Pixel, asleep. Press for a message.">
+        <span class="pixel-z" aria-hidden="true">z</span>
+        <!-- Pixel's drawing, from the portfolio: one face shows at a time (styles.css). -->
+        <svg class="pix-svg" viewBox="0 0 52 56" aria-hidden="true"><g class="pix-body">
+          <line x1="26" y1="2" x2="26" y2="10" class="pix-line"></line>
+          <circle cx="26" cy="3" r="3" class="pix-light"></circle>
+          <rect x="6" y="10" width="40" height="30" rx="9" class="pix-shell"></rect>
+          <rect x="13" y="18" width="26" height="14" rx="5" class="pix-screen"></rect>
+          <g class="pix-eyes"><rect class="pix-eye" x="17" y="22" width="5" height="6" rx="2"></rect><rect class="pix-eye" x="30" y="22" width="5" height="6" rx="2"></rect></g>
+          <g class="pix-face pix-face-happy"><path d="M17 27q2.5-4.5 5 0M30 27q2.5-4.5 5 0"></path></g>
+          <g class="pix-face pix-face-mad"><path d="M16 21l7 3.5V29h-6.5zM36 21l-7 3.5V29h6.5z"></path></g>
+          <g class="pix-face pix-face-dizzy"><path d="M17 22l5 6M22 22l-5 6M30 22l5 6M35 22l-5 6"></path></g>
+          <g class="pix-face pix-face-sleep"><path d="M17 26h5M30 26h5"></path></g>
+          <rect x="14" y="42" width="24" height="10" rx="4" class="pix-shell"></rect>
+        </g></svg>
+        <span class="pixel-desk" aria-hidden="true"></span>
+      </button>
+    </div>
+    <p id="pixel-said" class="visually-hidden" role="status"></p>
+  </div>
 
   <dialog id="add-dialog" aria-labelledby="add-title">
     <form id="add-form" novalidate>
@@ -152,11 +318,16 @@
   </dialog>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
-    <h2 id="settings-title">Settings</h2>
+    <div class="settings-header">
+      <h2 id="settings-title">Settings</h2>
+      <button id="settings-x" class="close-button" type="button" aria-label="Close settings">×</button>
+    </div>
 
-    <h3>Look</h3>
+    <details id="settings-look" class="settings-section" open>
+    <summary>Look</summary>
     <label for="theme-select">Theme</label>
     <select id="theme-select">
+      <option value="launcher">Launcher (portfolio look)</option>
       <option value="auto">Auto (follow my device)</option>
       <option value="light">Light</option>
       <option value="dark">Dark</option>
@@ -164,7 +335,7 @@
       <option value="midnight">Midnight</option>
       <option value="contrast">High contrast</option>
     </select>
-    <fieldset>
+    <fieldset id="accent-fieldset">
       <legend>Accent colour</legend>
       <div class="swatches">
         <label class="swatch"><input type="radio" name="accent" value="blue"><span class="swatch-color" style="--swatch: #2563eb"></span>Blue</label>
@@ -175,33 +346,23 @@
         <label class="swatch"><input type="radio" name="accent" value="teal"><span class="swatch-color" style="--swatch: #0f766e"></span>Teal</label>
       </div>
     </fieldset>
-
-    <h3>Daily goals</h3>
-    <p class="hint">Set a target for a task. Today shows how close you are.</p>
-    <ul id="goal-list" class="goal-list"></ul>
-    <label for="goal-task">Task</label>
-    <input id="goal-task" type="text" list="task-suggestions" autocomplete="off" aria-describedby="goal-message">
-    <fieldset>
-      <legend>Goal each day</legend>
-      <div class="duration-pair">
-        <label for="goal-hours"><input id="goal-hours" type="number" min="0" max="24" step="1" inputmode="numeric" value="1" aria-describedby="goal-message"> hours</label>
-        <label for="goal-minutes"><input id="goal-minutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-describedby="goal-message"> minutes</label>
+    <!-- Launcher only: the accent is one of these gradients. -->
+    <fieldset id="gradient-fieldset" hidden>
+      <legend>Accent gradient</legend>
+      <div class="swatches">
+        <label class="swatch"><input type="radio" name="gradient" value="sunset"><span class="swatch-color" style="--swatch: linear-gradient(135deg, #ff7a59, #c64bff, #3f6bff)"></span>Sunset</label>
+        <label class="swatch"><input type="radio" name="gradient" value="ocean"><span class="swatch-color" style="--swatch: linear-gradient(135deg, #12b5a5, #1f9bd1, #3f6bff)"></span>Ocean</label>
+        <label class="swatch"><input type="radio" name="gradient" value="lime"><span class="swatch-color" style="--swatch: linear-gradient(135deg, #8fd14f, #2fb37a, #0f8fa3)"></span>Lime</label>
+        <label class="swatch"><input type="radio" name="gradient" value="ember"><span class="swatch-color" style="--swatch: linear-gradient(135deg, #ff9f43, #ff5f45, #d6336c)"></span>Ember</label>
       </div>
     </fieldset>
-    <button id="goal-save" class="secondary-button" type="button">Set goal</button>
-    <p id="goal-message" class="form-message" role="status"></p>
+    <label class="checkbox switch"><input id="pixel-check" type="checkbox" role="switch"> Show Pixel</label>
+    </details>
 
-    <h3>Rename or merge a task</h3>
-    <p class="hint">Fixes a name everywhere. Renaming to a name you already use merges the two.</p>
-    <label for="rename-from">Task</label>
-    <select id="rename-from" aria-describedby="rename-message"></select>
-    <label for="rename-to">New name</label>
-    <input id="rename-to" type="text" list="task-suggestions" autocomplete="off" aria-describedby="rename-message">
-    <button id="rename-save" class="secondary-button" type="button">Rename</button>
-    <p class="form-message-row"><span id="rename-message" class="form-message" role="status"></span>
-      <button id="rename-undo" class="link-button" type="button" hidden>Undo</button></p>
 
-    <h3>Reminder</h3>
+
+    <details class="settings-section">
+    <summary>Reminder</summary>
     <label for="long-timer-select">Ask “Still working?” when a timer has run for</label>
     <select id="long-timer-select">
       <option value="0">Never ask</option>
@@ -209,17 +370,133 @@
       <option value="4">4 hours</option>
       <option value="8">8 hours</option>
     </select>
+    </details>
 
-    <h3>Keyboard shortcuts</h3>
+    <details class="settings-section">
+    <summary>Keyboard shortcuts</summary>
     <label class="checkbox"><input id="shortcuts-check" type="checkbox"> Use keyboard shortcuts</label>
     <ul class="hint shortcut-list">
       <li><kbd>S</kbd> start or stop the timer</li>
       <li><kbd>N</kbd> go to the task box</li>
-      <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> Today, History, Week</li>
+      <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> Today, History, Week, Tasks</li>
     </ul>
     <p class="hint">They're ignored while you're typing in a box.</p>
+    </details>
 
-    <button id="settings-close" class="action-button" type="button">Done</button>
+    <details class="settings-section">
+    <summary>Share</summary>
+    <label for="share-date">Day to copy</label>
+    <input id="share-date" type="date">
+    <button id="copy-button" class="secondary-button" type="button">Copy this day as text</button>
+    <label class="checkbox"><input id="youtrack-check" type="checkbox"> Use YouTrack format</label>
+    <p id="copy-message" class="form-message" role="status"></p>
+    <textarea id="copy-fallback" class="copy-fallback" rows="5" readonly aria-label="Text to copy" hidden></textarea>
+    <button id="export-button" class="secondary-button" type="button">Download all entries for Excel</button>
+    <p id="export-message" class="form-message" role="status"></p>
+    </details>
+
+    <details class="settings-section">
+    <summary>Backup</summary>
+    <p class="hint">Your times are saved only in this browser. Keep a backup file in case you clear
+      your browser data or switch devices.</p>
+    <button id="backup-button" class="secondary-button" type="button">Download a backup</button>
+    <button id="restore-button" class="secondary-button" type="button">Restore from a backup</button>
+    <input id="restore-input" type="file" accept=".json,application/json" hidden>
+    <p class="form-message-row"><span id="backup-message" class="form-message" role="status"></span>
+      <button id="backup-undo" class="link-button" type="button" hidden>Undo</button></p>
+    </details>
+
+    <details class="settings-section">
+    <summary>Help</summary>
+    <p class="hint">Pixel walks you through the app in six quick steps.</p>
+    <button id="tour-again" class="secondary-button" type="button">Show the tour again</button>
+    </details>
+  </dialog>
+
+  <dialog id="plan-dialog" aria-labelledby="plan-title">
+    <div class="settings-header">
+      <h2 id="plan-title">Plan my day</h2>
+      <button id="plan-x" class="close-button" type="button" aria-label="Close plan">×</button>
+    </div>
+    <p class="hint">How long you mean to spend on each task, for today only. Daily goals (in
+      Settings) repeat every day; a plan doesn't.</p>
+    <p id="plan-empty" class="empty">Nothing planned for today yet.</p>
+    <ul id="plan-list" class="goal-list"></ul>
+    <label for="plan-task">Task</label>
+    <input id="plan-task" type="text" list="task-suggestions" autocomplete="off" aria-describedby="plan-message">
+    <fieldset>
+      <legend>Planned time</legend>
+      <div class="duration-pair">
+        <label for="plan-hours"><input id="plan-hours" type="number" min="0" max="24" step="1" inputmode="numeric" value="1" aria-describedby="plan-message"> hours</label>
+        <label for="plan-minutes"><input id="plan-minutes" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" aria-describedby="plan-message"> minutes</label>
+      </div>
+    </fieldset>
+    <button id="plan-save" class="secondary-button" type="button">Add to today's plan</button>
+    <p id="plan-message" class="form-message" role="status"></p>
+  </dialog>
+
+  <!-- Pixel's tour: a spotlight on one part of the page at a time, with his card beside it. -->
+  <dialog id="tour" class="tour" aria-labelledby="tour-title" aria-describedby="tour-text">
+    <div id="tour-spot" class="tour-spot" aria-hidden="true"></div>
+    <div id="tour-card" class="tour-card">
+      <svg class="pix-svg tour-pixel" viewBox="0 0 52 60" aria-hidden="true">
+        <path class="tour-flame" d="M19 52q7 16 14 0z"></path>
+        <line x1="26" y1="2" x2="26" y2="10" class="pix-line"></line>
+        <circle cx="26" cy="3" r="3" class="pix-light"></circle>
+        <rect x="6" y="10" width="40" height="30" rx="9" class="pix-shell"></rect>
+        <rect x="13" y="18" width="26" height="14" rx="5" class="pix-screen"></rect>
+        <path class="tour-pixel-face" d="M17 27q2.5-4.5 5 0M30 27q2.5-4.5 5 0"></path>
+        <rect x="14" y="42" width="24" height="10" rx="4" class="pix-shell"></rect>
+      </svg>
+      <div class="tour-bubble">
+        <div class="tour-top">
+          <p id="tour-title" class="tour-step"></p>
+          <span id="tour-dots" class="tour-dots" aria-hidden="true"></span>
+        </div>
+        <p id="tour-text" class="tour-text"></p>
+        <div class="tour-buttons">
+          <button id="tour-skip" class="link-button" type="button">Skip tour</button>
+          <button id="tour-back" class="header-button" type="button">Back</button>
+          <button id="tour-next" class="tour-next" type="button">Next</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Pixel's game: he makes you play it when his temper runs out. -->
+  <dialog id="clock-game" class="clock-game" aria-labelledby="game-title" aria-describedby="game-rules">
+    <div class="settings-header">
+      <h2 id="game-title">Pixel's game: Stop the Clock</h2>
+      <button id="game-quit" class="header-button" type="button">Give up</button>
+    </div>
+    <p id="game-rules" class="game-rules">Stop the clock on exactly <strong>5.00</strong> seconds. Get within
+      <strong>0.10</strong> on 2 of 3 tries and Pixel calms down. Try 3 goes dark: the numbers vanish after 2 seconds.</p>
+    <div class="game-face">
+      <svg class="game-ring" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="game-ring-track" cx="100" cy="100" r="86"></circle>
+        <circle id="game-ring-fill" class="game-ring-fill" cx="100" cy="100" r="86" transform="rotate(-90 100 100)"></circle>
+        <line class="game-ring-mark" x1="100" y1="8" x2="100" y2="22"></line>
+      </svg>
+      <div class="game-readout">
+        <span id="game-try" class="game-try">Try 1 of 3</span>
+        <span id="game-clock" class="game-clock">0.00</span>
+        <span class="game-target">target 5.00</span>
+      </div>
+    </div>
+    <button id="game-button" class="game-button" type="button">Start</button>
+    <ol id="game-tries" class="game-tries" aria-label="Tries"></ol>
+    <div class="game-pixel">
+      <p id="game-say" class="game-say" role="status"></p>
+      <svg class="pix-svg game-pixel-svg" viewBox="0 0 52 56" aria-hidden="true">
+        <line x1="26" y1="2" x2="26" y2="10" class="pix-line"></line>
+        <circle cx="26" cy="3" r="3" class="pix-light"></circle>
+        <rect x="6" y="10" width="40" height="30" rx="9" class="pix-shell"></rect>
+        <rect x="13" y="18" width="26" height="14" rx="5" class="pix-screen"></rect>
+        <path class="game-pixel-face" d="M16 21l7 3.5V29h-6.5zM36 21l-7 3.5V29h6.5z"></path>
+        <path class="game-pixel-happy" d="M17 27q2.5-4.5 5 0M30 27q2.5-4.5 5 0"></path>
+        <rect x="14" y="42" width="24" height="10" rx="4" class="pix-shell"></rect>
+      </svg>
+    </div>
   </dialog>
 
   <div id="undo-toast" class="toast" role="status" hidden>
