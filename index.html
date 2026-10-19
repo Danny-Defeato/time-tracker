@@ -51,8 +51,14 @@
       <p id="status" class="status" role="status"></p>
     </section>
 
-    <section aria-labelledby="today-heading">
-      <h2 id="today-heading">Today</h2>
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button id="tab-today" class="tab" type="button" role="tab" aria-controls="panel-today" aria-selected="true">Today</button>
+      <button id="tab-history" class="tab" type="button" role="tab" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
+      <button id="tab-week" class="tab" type="button" role="tab" aria-controls="panel-week" aria-selected="false" tabindex="-1">Last 7 days</button>
+    </div>
+
+    <section id="panel-today" class="panel" role="tabpanel" aria-labelledby="tab-today">
+      <h2 id="today-heading" class="visually-hidden">Today</h2>
       <p id="today-empty" class="empty">Nothing tracked today yet.</p>
       <ul id="task-rows" class="task-rows"></ul>
 
@@ -61,8 +67,8 @@
       <ul id="entry-list" class="entry-list" aria-labelledby="entries-heading"></ul>
     </section>
 
-    <section aria-labelledby="history-heading">
-      <h2 id="history-heading">History</h2>
+    <section id="panel-history" class="panel" role="tabpanel" aria-labelledby="tab-history" hidden>
+      <h2 id="history-heading" class="visually-hidden">History</h2>
       <label for="history-date">Day</label>
       <input id="history-date" type="date">
       <p class="section-total">Total <strong id="history-total">0h 00m</strong></p>
@@ -74,8 +80,8 @@
       </div>
     </section>
 
-    <section aria-labelledby="week-heading">
-      <h2 id="week-heading">Last 7 days</h2>
+    <section id="panel-week" class="panel" role="tabpanel" aria-labelledby="tab-week" hidden>
+      <h2 id="week-heading" class="visually-hidden">Last 7 days</h2>
       <p class="section-total">Total <strong id="week-total">0h 00m</strong></p>
       <h3 id="week-days-heading">By day</h3>
       <ul id="week-days" class="week-days" aria-labelledby="week-days-heading"></ul>

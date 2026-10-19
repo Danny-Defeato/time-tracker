@@ -39,9 +39,9 @@ Artifact 2 ("something you will use").
 - An entry that crosses midnight counts toward each day for the part that falls on it.
   Do this split in one shared helper used by Today, History, the 7-day summary and
   the CSV export, so their numbers always agree.
-- Totals are built from whole minutes: each entry's part of a day is rounded to the
-  nearest minute, and every total is a sum of those. So rows add up to the day total
-  and days add up to the week total exactly. The live clock still shows seconds.
+- Totals are built from whole seconds: each entry's part of a day is rounded to the
+  nearest second, and every total is a sum of those. So rows add up to the day total
+  and days add up to the week total exactly.
 - Times are shown in my local time zone.
 
 ## Features (version 1)
@@ -74,7 +74,9 @@ Artifact 2 ("something you will use").
 - Each task gets a colour from a fixed 8-colour palette, picked from its name, so the
   same name always has the same colour. It's used for its row stripe, bar and entry dot.
   Palette colours must be readable in both themes.
-- Durations shown as `1h 05m` (and `mm:ss` on the live timer).
+- Durations shown as `1h 05m 09s` (and `mm:ss` on the live timer).
+- Layout: header, then the Timer (always visible), then tabs: Today | History | Last 7 days.
+  The page opens on Today. Tabs work with arrow keys, Home and End.
 - Buttons and inputs must work with the keyboard and have visible focus.
 
 ## How to work with me

@@ -383,6 +383,46 @@ button:focus-visible {
   color: var(--text);
 }
 
+/* ---------- Tabs ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: -1px; /* tabs sit on the panel's top border */
+}
+
+.tab {
+  flex: 1;
+  min-height: 44px;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--surface);
+  position: relative; /* above the panel's border */
+}
+
+.panel {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 /* ---------- History and last 7 days ---------- */
 
 .section-total {

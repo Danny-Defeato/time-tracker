@@ -122,3 +122,22 @@ What I set out to build, what I asked the agent for, what I decided, and what I 
 - Rows without buttons (History and the week) are rebuilt every second. Rows with buttons only get their numbers updated, so keyboard focus is never lost.
 
 **Testing:** Claude ran 64 checks in headless Chrome covering features 1–3, all passing. The new checks covered the History default and limits, the midnight split on both days, empty days, week totals adding up, clicking a day, delete and Undo from History, whole-minute rounding, live updates, and the phone layout. The first run had 5 failures, all from the test clicking things outside the visible part of the now-taller page. Fixed by scrolling to each element before clicking, as a real user would.
+
+## 2026-10-18: Tabs and seconds
+
+**Asked for:** make the page collapsible or tabbed (Claude's suggestion, because the page was getting long on a phone), and show seconds, since minutes felt too rough for tracking.
+
+**About seconds:** Claude pointed out that tracking was never inaccurate. Every start and stop is saved to the millisecond, and only the totals were rounded for display. Seconds are still useful for short tasks and for checking that numbers add up, so they're now shown everywhere.
+
+**Changed:** `index.html`, `styles.css`, `app.js`, `CLAUDE.md`.
+- **Seconds:** durations are now `1h 05m 09s`. Totals are built from whole seconds (each entry's part of a day rounded to the nearest second), so rows, days and the week still add up exactly. While a timer runs, the totals tick every second.
+- **Tabs:** the Timer stays at the top, with **Today | History | Last 7 days** tabs below it. The page opens on Today. Clicking a day in Last 7 days switches to History on that day.
+- **Keyboard:** only the selected tab is in the Tab order. The arrow keys, Home and End move between tabs, following the standard pattern for accessible tabs. The panel headings are kept for screen readers but hidden visually, since the tab names already say the same thing.
+
+**Decisions**
+- Tabs rather than collapsible sections: they're shorter on a phone and only one view shows at a time.
+- The page always opens on Today; the last tab used isn't remembered. That could be added later if wanted.
+- Entry time ranges still show hours and minutes (for example "9:05 AM – 9:45 AM"), and only durations show seconds. That keeps the list readable.
+- For Phase 4: YouTrack takes whole minutes, so the Copy summary's YouTrack preset will round to minutes. The CSV can include a seconds column.
+
+**Testing:** Claude ran 70 checks in headless Chrome, all passing. New checks covered the tabs (click, arrow keys, Home and End, only one panel shown), live seconds in every total, totals adding up with odd-second entries (40s + 40s + 20s = 1m 40s everywhere), 44px tap targets on tabs, and the Today tab fitting on a phone. Earlier checks were updated for the seconds format. One first-run failure came from the test measuring a button inside a hidden tab; the app was fine.

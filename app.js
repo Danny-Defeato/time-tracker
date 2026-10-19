@@ -151,34 +151,34 @@ function msOnDay(startMs, endMs, day) {
   return Math.max(0, Math.min(endMs, day.end) - Math.max(startMs, day.start));
 }
 
-// An entry's part of a day in whole minutes (nearest). Every total is a sum of
+// An entry's part of a day in whole seconds (nearest). Every total is a sum of
 // these, so rows add up to day totals and days add up to the week total exactly.
-function minutesOnDay(startMs, endMs, day) {
-  return Math.round(msOnDay(startMs, endMs, day) / 60000);
+function secondsOnDay(startMs, endMs, day) {
+  return Math.round(msOnDay(startMs, endMs, day) / 1000);
 }
 
-// Minutes per task on a day, including the running timer up to now. A task is
-// included if it has any time on the day, even if that rounds to 0 minutes.
+// Seconds per task on a day, including the running timer up to now. A task is
+// included if it has any time on the day, even if that rounds to 0 seconds.
 function dayTotals(day) {
   const totals = new Map();
-  const add = (task, minutes) => totals.set(task, (totals.get(task) || 0) + minutes);
+  const add = (task, seconds) => totals.set(task, (totals.get(task) || 0) + seconds);
   for (const e of state.entries) {
     const startMs = Date.parse(e.start);
     const endMs = Date.parse(e.end);
-    if (msOnDay(startMs, endMs, day) > 0) add(e.task, minutesOnDay(startMs, endMs, day));
+    if (msOnDay(startMs, endMs, day) > 0) add(e.task, secondsOnDay(startMs, endMs, day));
   }
   if (state.running) {
     // Included from the moment it starts, so its row appears straight away.
     const startMs = Date.parse(state.running.start);
     const now = Date.now();
-    if (startMs < day.end && now >= day.start) add(state.running.task, minutesOnDay(startMs, now, day));
+    if (startMs < day.end && now >= day.start) add(state.running.task, secondsOnDay(startMs, now, day));
   }
   return totals;
 }
 
-function sumMinutes(totals) {
+function sumSeconds(totals) {
   let sum = 0;
-  for (const minutes of totals.values()) sum += minutes;
+  for (const seconds of totals.values()) sum += seconds;
   return sum;
 }
 
@@ -229,15 +229,16 @@ function formatClock(ms) {
   return pad2(minutes) + ":" + pad2(seconds);
 }
 
-// Durations: "1h 05m".
-function formatMinutes(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  return hours + "h " + pad2(totalMinutes % 60) + "m";
+// Durations: "1h 05m 09s".
+function formatSeconds(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return hours + "h " + pad2(minutes) + "m " + pad2(totalSeconds % 60) + "s";
 }
 
-// Rounded to the nearest minute, like the totals.
+// Rounded to the nearest second, like the totals.
 function formatDuration(ms) {
-  return formatMinutes(Math.round(Math.max(0, ms) / 60000));
+  return formatSeconds(Math.round(Math.max(0, ms) / 1000));
 }
 
 // "9:05 AM", with the date in front when it isn't on `day` ("Oct 17, 11:30 PM").
@@ -295,6 +296,38 @@ function cycleTheme() {
 }
 
 let currentTheme = loadTheme();
+
+// ---------- Tabs ----------
+
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+
+// Shows one panel. Only the selected tab is in the Tab order; arrow keys move between tabs.
+function selectTab(tab, { focus = false } = {}) {
+  for (const t of tabs) {
+    const selected = t === tab;
+    t.setAttribute("aria-selected", String(selected));
+    t.tabIndex = selected ? 0 : -1;
+    document.getElementById(t.getAttribute("aria-controls")).hidden = !selected;
+  }
+  if (focus) tab.focus();
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => selectTab(tab));
+  tab.addEventListener("keydown", (event) => {
+    const i = tabs.indexOf(tab);
+    const next = {
+      ArrowRight: tabs[(i + 1) % tabs.length],
+      ArrowLeft: tabs[(i - 1 + tabs.length) % tabs.length],
+      Home: tabs[0],
+      End: tabs[tabs.length - 1],
+    }[event.key];
+    if (next) {
+      event.preventDefault();
+      selectTab(next, { focus: true });
+    }
+  });
+}
 
 // ---------- Delete and undo ----------
 
@@ -431,18 +464,18 @@ function makeTaskRow(name, { button = false, dimmed = false } = {}) {
   return li;
 }
 
-// Fills in row times and share bars from a Map of task -> minutes.
+// Fills in row times and share bars from a Map of task -> seconds.
 function updateRowNumbers(list, totals) {
-  const total = sumMinutes(totals);
+  const total = sumSeconds(totals);
   for (const li of list.children) {
-    const minutes = totals.get(li.dataset.task) || 0;
-    li.querySelector(".task-time").textContent = formatMinutes(minutes);
+    const seconds = totals.get(li.dataset.task) || 0;
+    li.querySelector(".task-time").textContent = formatSeconds(seconds);
     const fill = li.querySelector(".share-fill");
-    if (fill) fill.style.width = (total > 0 ? (minutes / total) * 100 : 0) + "%";
+    if (fill) fill.style.width = (total > 0 ? (seconds / total) * 100 : 0) + "%";
   }
 }
 
-// Task names, most minutes first (ties alphabetical).
+// Task names, most seconds first (ties alphabetical).
 function byMostTime(totals) {
   return [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || a.localeCompare(b));
 }
@@ -492,7 +525,7 @@ function renderEntries(list, day) {
 
       const duration = document.createElement("span");
       duration.className = "entry-duration";
-      duration.textContent = formatMinutes(minutesOnDay(startMs, endMs, day));
+      duration.textContent = formatSeconds(secondsOnDay(startMs, endMs, day));
 
       const del = document.createElement("button");
       del.type = "button";
@@ -529,7 +562,7 @@ function renderHistoryRows() {
   const totals = dayTotals(historyDay());
   historyRows.replaceChildren(...byMostTime(totals).map((name) => makeTaskRow(name)));
   updateRowNumbers(historyRows, totals);
-  historyTotalText.textContent = formatMinutes(sumMinutes(totals));
+  historyTotalText.textContent = formatSeconds(sumSeconds(totals));
   return totals.size;
 }
 
@@ -547,7 +580,7 @@ function weekData() {
   const days = lastSevenDays().map((day) => ({ day, totals: dayTotals(day) }));
   const byTask = new Map();
   for (const { totals } of days) {
-    for (const [task, minutes] of totals) byTask.set(task, (byTask.get(task) || 0) + minutes);
+    for (const [task, seconds] of totals) byTask.set(task, (byTask.get(task) || 0) + seconds);
   }
   return { days, byTask };
 }
@@ -573,8 +606,8 @@ function renderWeekDays(data) {
       button.append(label, time);
       button.addEventListener("click", () => {
         showHistoryDay(dateKey(day.start));
+        selectTab(document.getElementById("tab-history"));
         historyDateInput.focus();
-        historyDateInput.scrollIntoView({ block: "center" });
       });
 
       const bar = document.createElement("div");
@@ -591,14 +624,14 @@ function renderWeekDays(data) {
 
 // Numbers that change while a timer runs. Day bars are relative to the busiest day.
 function updateWeekNumbers(data) {
-  const dayMinutes = new Map(data.days.map(({ day, totals }) => [String(day.start), sumMinutes(totals)]));
-  const busiest = Math.max(0, ...dayMinutes.values());
+  const daySeconds = new Map(data.days.map(({ day, totals }) => [String(day.start), sumSeconds(totals)]));
+  const busiest = Math.max(0, ...daySeconds.values());
   for (const li of weekDays.children) {
-    const minutes = dayMinutes.get(li.dataset.dayStart) || 0;
-    li.querySelector(".week-day-time").textContent = formatMinutes(minutes);
-    li.querySelector(".share-fill").style.width = (busiest > 0 ? (minutes / busiest) * 100 : 0) + "%";
+    const seconds = daySeconds.get(li.dataset.dayStart) || 0;
+    li.querySelector(".week-day-time").textContent = formatSeconds(seconds);
+    li.querySelector(".share-fill").style.width = (busiest > 0 ? (seconds / busiest) * 100 : 0) + "%";
   }
-  weekTotalText.textContent = formatMinutes(sumMinutes(data.byTask));
+  weekTotalText.textContent = formatSeconds(sumSeconds(data.byTask));
   weekTasks.replaceChildren(...byMostTime(data.byTask).map((name) => makeTaskRow(name)));
   updateRowNumbers(weekTasks, data.byTask);
   weekEmpty.hidden = data.byTask.size > 0;
@@ -610,7 +643,7 @@ function updateWeekNumbers(data) {
 // Rows with buttons only get new text and widths here, so focus isn't disturbed.
 function renderLive(totals) {
   clock.textContent = formatClock(elapsedMs());
-  todayTotalText.textContent = formatMinutes(sumMinutes(totals));
+  todayTotalText.textContent = formatSeconds(sumSeconds(totals));
   updateRowNumbers(taskRows, totals);
   if (historyKey === dateKey(Date.now())) renderHistoryRows();
   updateWeekNumbers(weekData());
